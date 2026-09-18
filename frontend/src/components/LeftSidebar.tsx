@@ -1,5 +1,5 @@
 import React from "react";
-import { Lightbulb, Layers, Search, FileText, ShieldCheck } from "lucide-react";
+import { Lightbulb, Layers, Search, FileText } from "lucide-react";
 
 export const LeftSidebar: React.FC = () => {
   return (
@@ -45,19 +45,6 @@ export const LeftSidebar: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
-
-      {/* 2. Our Promise Card */}
-      <div className="sidebar-card promise-card">
-        <div className="sidebar-card-header">
-          <ShieldCheck size={18} className="sidebar-header-icon promise-icon" />
-          <h4 className="sidebar-card-title">Our Promise</h4>
-        </div>
-        <p className="promise-text">
-          No hardcoded data. No fake evidence.
-          <br />
-          Only real sources and verified information.
-        </p>
       </div>
     </aside>
   );
