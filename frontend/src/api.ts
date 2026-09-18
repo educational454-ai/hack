@@ -1,6 +1,8 @@
 import { AnalysisResult, HealthStatus } from "./types";
 
-const API_BASE = ""; // Vite proxy forwards /api to http://127.0.0.1:8000
+// Read Render backend API URL from VITE_API_BASE_URL (or VITE_API_URL), falling back to relative path for Vite local proxy
+const rawApiBase = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "";
+const API_BASE = rawApiBase.replace(/\/$/, "");
 
 export async function fetchHealth(): Promise<HealthStatus> {
   try {
