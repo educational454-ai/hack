@@ -6,12 +6,10 @@ import {
   XCircle,
   CheckCircle2,
   HelpCircle,
-  Image as ImageIcon,
 } from "lucide-react";
 import {
   AnalysisResult,
   EvidenceItem,
-  RelevantImage,
 } from "../types";
 
 interface ResultCardProps {
@@ -61,10 +59,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         <p className="explanation-text">{result.explanation}</p>
       </div>
 
-      {/* 3. Visual Evidence Section */}
-      <VisualEvidenceSection images={result.relevant_images || []} />
-
-      {/* 4. Summary Evidence Cards */}
+      {/* 3. Summary Evidence Cards */}
       {!isSubjective && summaryEvidence.length > 0 && (
         <div className="card-section">
           <h3 className="card-heading">
@@ -78,6 +73,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
           </div>
         </div>
       )}
+
+
 
       {/* 5. Evidence Limitations */}
       {result.evidence_limitations && result.evidence_limitations.length > 0 && (
@@ -96,108 +93,6 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
     </div>
   );
 };
-
-/* --- Visual Evidence Section --- */
-export const VisualEvidenceSection: React.FC<{ images: RelevantImage[] }> = ({ images }) => {
-  const [failedIndices, setFailedIndices] = React.useState<Record<number, boolean>>({});
-
-  if (!images || images.length === 0) return null;
-
-  // Filter valid candidate images (have thumbnail/image URL and haven't failed loading)
-  const candidateImages = images.filter(
-    (img, idx) => !failedIndices[idx] && img && (img.image_url || img.thumbnail_url)
-  );
-
-  if (candidateImages.length === 0) return null;
-
-  // Render max 2 images
-  const displayImages = candidateImages.slice(0, 2);
-
-  return (
-    <div className="card-section visual-evidence-section">
-      <div className="visual-evidence-header">
-        <h3 className="card-heading">
-          <ImageIcon size={19} className="heading-icon" />
-          Visual Evidence
-        </h3>
-        <p className="visual-evidence-disclaimer">
-          Visual context from retrieved web sources — images are not used as standalone proof.
-        </p>
-      </div>
-
-      <div className="visual-evidence-grid">
-        {displayImages.map((img, displayIdx) => {
-          const originalIdx = images.indexOf(img);
-          const sourceDomain = img.domain || extractDomainSimple(img.source_url);
-          const hasRelevance =
-            typeof img.relevance_score === "number" &&
-            !isNaN(img.relevance_score) &&
-            img.relevance_score > 0;
-
-          return (
-            <div key={displayIdx} className="visual-evidence-card">
-              <div className="visual-evidence-thumb-container">
-                <img
-                  src={img.thumbnail_url || img.image_url}
-                  alt={img.title || "Retrieved visual evidence"}
-                  className="visual-evidence-img"
-                  onError={() => {
-                    const idxToMark = originalIdx >= 0 ? originalIdx : displayIdx;
-                    setFailedIndices((prev) => ({ ...prev, [idxToMark]: true }));
-                  }}
-                />
-              </div>
-
-              <div className="visual-evidence-body">
-                <h4 className="visual-evidence-title" title={img.title}>
-                  {img.title || "Retrieved Visual Evidence"}
-                </h4>
-
-                <div className="visual-evidence-meta">
-                  {sourceDomain && (
-                    <span className="visual-evidence-domain" title={sourceDomain}>
-                      {sourceDomain}
-                    </span>
-                  )}
-                  {hasRelevance && (
-                    <span className="visual-evidence-relevance">
-                      Image relevance: {Math.round((img.relevance_score as number) * 100)}%
-                    </span>
-                  )}
-                </div>
-
-                {img.source_url ? (
-                  <a
-                    href={img.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="visual-evidence-link"
-                    title="Open official web source page"
-                  >
-                    View source <ExternalLink size={12} />
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-function extractDomainSimple(url: string): string {
-  if (!url) return "";
-  try {
-    const urlStr = url.startsWith("http") ? url : `http://${url}`;
-    const parsed = new URL(urlStr);
-    let host = parsed.hostname.toLowerCase();
-    if (host.startsWith("www.")) host = host.slice(4);
-    return host;
-  } catch {
-    return "";
-  }
-}
 
 /* --- Summary Evidence Card --- */
 const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
@@ -269,3 +164,6 @@ const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
     </div>
   );
 };
+
+
+

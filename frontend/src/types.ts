@@ -36,8 +36,6 @@ export interface RelevantImage {
   image_url: string;
   thumbnail_url: string;
   source_url: string;
-  domain?: string;
-  relevance_score?: number | null;
 }
 
 export interface AnalysisResult {

@@ -65,8 +65,6 @@ class RelevantImage(BaseModel):
     image_url: str
     thumbnail_url: str
     source_url: str
-    domain: Optional[str] = None
-    relevance_score: Optional[float] = None
 
 
 class AnalysisResult(BaseModel):
