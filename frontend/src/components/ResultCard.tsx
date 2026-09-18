@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ExternalLink,
   BookOpen,
@@ -6,14 +6,28 @@ import {
   XCircle,
   CheckCircle2,
   HelpCircle,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   AnalysisResult,
   EvidenceItem,
+  RelevantImage,
 } from "../types";
 
 interface ResultCardProps {
   result: AnalysisResult;
+}
+
+function extractDomain(url: string): string {
+  if (!url) return "Web Source";
+  try {
+    const parsed = new URL(url.startsWith("http") ? url : `http://${url}`);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith("www.")) host = host.slice(4);
+    return host;
+  } catch {
+    return "Web Source";
+  }
 }
 
 export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
@@ -24,6 +38,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
     ...result.contradicting_evidence,
     ...result.supporting_evidence,
   ].slice(0, 6);
+
+  const images = result.relevant_images || [];
 
   return (
     <div className="result-container">
@@ -59,7 +75,10 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         <p className="explanation-text">{result.explanation}</p>
       </div>
 
-      {/* 3. Summary Evidence Cards */}
+      {/* 3. Visual Evidence Section (Conditional) */}
+      <VisualEvidenceSection images={images} />
+
+      {/* 4. Summary Evidence Cards */}
       {!isSubjective && summaryEvidence.length > 0 && (
         <div className="card-section">
           <h3 className="card-heading">
@@ -73,8 +92,6 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
           </div>
         </div>
       )}
-
-
 
       {/* 5. Evidence Limitations */}
       {result.evidence_limitations && result.evidence_limitations.length > 0 && (
@@ -90,6 +107,89 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
           </ul>
         </div>
       )}
+    </div>
+  );
+};
+
+/* --- Visual Evidence Section Component --- */
+const VisualEvidenceSection: React.FC<{ images: RelevantImage[] }> = ({ images }) => {
+  const [failedUrls, setFailedUrls] = useState<Record<string, boolean>>({});
+
+  const handleImageError = (url: string) => {
+    setFailedUrls((prev) => ({ ...prev, [url]: true }));
+  };
+
+  // Filter out invalid or failed images, limit to max 2
+  const validImages = (images || [])
+    .filter(
+      (img) =>
+        img &&
+        (img.image_url || img.thumbnail_url) &&
+        !failedUrls[img.image_url] &&
+        !failedUrls[img.thumbnail_url]
+    )
+    .slice(0, 2);
+
+  if (validImages.length === 0) return null;
+
+  return (
+    <div className="card-section visual-evidence-section">
+      <div className="visual-evidence-header">
+        <h3 className="card-heading" style={{ marginBottom: "0.2rem" }}>
+          <ImageIcon size={19} className="heading-icon" />
+          Visual Evidence
+        </h3>
+        <p className="visual-evidence-disclaimer">
+          Visual context from retrieved web sources — images are not used as standalone proof.
+        </p>
+      </div>
+
+      <div className="visual-evidence-grid">
+        {validImages.map((img, idx) => {
+          const displayUrl = img.thumbnail_url || img.image_url;
+          const targetUrl = img.source_url || img.image_url;
+          const domain = extractDomain(targetUrl);
+          const altText = img.title || "Retrieved visual evidence";
+
+          return (
+            <div key={idx} className="visual-evidence-card">
+              <div className="visual-img-wrapper">
+                <img
+                  src={displayUrl}
+                  alt={altText}
+                  onError={() => handleImageError(displayUrl)}
+                  loading="lazy"
+                />
+              </div>
+              <div className="visual-card-body">
+                <h4 className="visual-card-title" title={img.title}>
+                  {img.title || "Related Web Article"}
+                </h4>
+                <div className="visual-card-footer">
+                  <span className="visual-domain">{domain}</span>
+                  {img.relevance_score != null ? (
+                    <span className="visual-relevance">
+                      Image relevance: {Math.round(img.relevance_score <= 1 ? img.relevance_score * 100 : img.relevance_score)}%
+                    </span>
+                  ) : null}
+                  {targetUrl ? (
+                    <a
+                      href={targetUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="details-toggle-btn"
+                      title="View original article source"
+                      aria-label={`Open source article on ${domain}`}
+                    >
+                      Source <ExternalLink size={12} />
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
