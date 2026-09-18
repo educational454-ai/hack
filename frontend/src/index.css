@@ -201,7 +201,8 @@ body {
 
 /* Main Canvas Wrapper */
 .app-container {
-  max-width: 1400px;
+  max-width: 1480px;
+  width: 100%;
   margin: 0 auto;
   background: var(--bg-card);
   border: 1px solid var(--border-card);
@@ -212,7 +213,7 @@ body {
 /* 3-Column Desktop Dashboard Layout */
 .app-layout {
   display: grid;
-  grid-template-columns: 260px 1fr 310px;
+  grid-template-columns: 240px minmax(0, 1fr) 290px;
   gap: 1.5rem;
   align-items: start;
 }
@@ -228,6 +229,7 @@ body {
   max-height: calc(100vh - 3rem);
   overflow-y: auto;
   padding-right: 2px;
+  min-width: 0;
 }
 
 /* Custom scrollbars for sidebars */
@@ -246,6 +248,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: 100%;
 }
 
 /* Sidebar Cards Base */
@@ -941,17 +944,11 @@ body {
   white-space: pre-wrap;
 }
 
-/* 3-Column Evidence Summary Grid (max 2 rows = max 6 cards) */
+/* Evidence Summary Grid */
 .evidence-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
   gap: 1rem;
-}
-
-@media (max-width: 860px) {
-  .evidence-summary-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  }
 }
 
 .summary-ev-card {
@@ -962,6 +959,8 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
   transition: border-color 0.2s ease;
 }
 
@@ -973,6 +972,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin-bottom: 0.75rem;
 }
 
@@ -1027,12 +1028,15 @@ body {
   color: var(--text-secondary);
   line-height: 1.48;
   margin-bottom: 0.85rem;
+  word-break: break-word;
 }
 
 .summary-ev-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   padding-top: 0.65rem;
   border-top: 1px solid var(--border-subtle);
   margin-top: auto;
@@ -1042,6 +1046,10 @@ body {
   font-size: 0.76rem;
   font-weight: 600;
   color: var(--text-muted);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .details-toggle-btn {
