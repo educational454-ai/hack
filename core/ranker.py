@@ -160,3 +160,126 @@ def rank_evidence_chunks(
             break
 
     return unique_by_url
+
+
+def score_image_relevance(claim: str, image_dict: Dict[str, Any]) -> float:
+    """Computes generic semantic relevance score (0.0 - 1.0) between claim and real textual image metadata.
+
+    Only uses real textual metadata fields ('title', 'alt', 'page_title').
+    Raw image URLs and source URLs are NOT used as semantic evidence text.
+    """
+    if not claim or not isinstance(image_dict, dict):
+        return 0.0
+
+    meta_parts = []
+    title_val = image_dict.get("title")
+    alt_val = image_dict.get("alt")
+    page_title_val = image_dict.get("page_title")
+
+    if title_val and str(title_val).strip():
+        meta_parts.append(str(title_val).strip())
+    if alt_val and str(alt_val).strip():
+        meta_parts.append(str(alt_val).strip())
+    if page_title_val and str(page_title_val).strip():
+        meta_parts.append(str(page_title_val).strip())
+
+    meta_text = " ".join(meta_parts).strip()
+    if not meta_text:
+        return 0.0
+
+    sim_score = 0.0
+    if config.has_hf_token:
+        try:
+            embs = get_hf_embeddings([claim, meta_text], token=config.hf_token, model_id=config.hf_embedding_model)
+            if len(embs) == 2:
+                sim_score = cosine_similarity(embs[0], embs[1])
+        except Exception:
+            pass
+
+    if sim_score == 0.0 and not config.low_memory_mode:
+        local_model = get_local_embedder()
+        if local_model is not None:
+            try:
+                c_vec = local_model.encode(claim).tolist()
+                m_vec = local_model.encode(meta_text).tolist()
+                sim_score = cosine_similarity(c_vec, m_vec)
+            except Exception:
+                pass
+
+    if sim_score == 0.0:
+        sim_score = compute_lexical_similarity(claim, meta_text)
+
+    claim_terms = re_tokenize(claim)
+    meta_terms = set(re_tokenize(meta_text))
+    if claim_terms:
+        matches = sum(1 for t in claim_terms if t in meta_terms)
+        ratio = matches / len(claim_terms)
+    else:
+        ratio = 1.0
+
+    if len(claim_terms) >= 3 and ratio < 0.35:
+        sim_score = sim_score * (0.3 + 0.7 * ratio)
+
+    return round(sim_score, 4)
+
+
+def rank_and_filter_images(
+    claim: str,
+    raw_images: List[Dict[str, Any]],
+    top_k: int = 2,
+    min_threshold: float = 0.45,
+) -> List[Any]:
+    """Ranks candidate images by semantic relevance and filters out irrelevant images.
+
+    Returns up to top_k RelevantImage instances that pass min_threshold.
+    Returns [] if zero candidates satisfy the threshold.
+    """
+    from .schemas import RelevantImage
+    from .source_filter import classify_source
+
+    if not raw_images or not claim:
+        return []
+
+    scored: List[tuple[float, RelevantImage]] = []
+    seen_urls = set()
+
+    for img in raw_images:
+        if not isinstance(img, dict):
+            continue
+        img_url = img.get("image_url")
+        if not img_url or img_url in seen_urls:
+            continue
+        seen_urls.add(img_url)
+
+        base_score = score_image_relevance(claim, img)
+        if base_score <= 0.0:
+            continue
+
+        source_val = str(img.get("source_url")).strip() if img.get("source_url") else None
+
+        # Generic source quality weighting using existing classify_source
+        if source_val:
+            _, _, authority_weight = classify_source(source_val)
+            final_score = round(base_score * (0.8 + 0.2 * authority_weight), 4)
+        else:
+            final_score = base_score
+
+        if final_score >= min_threshold:
+            title_val = str(img.get("title")).strip() if img.get("title") else None
+            thumb_val = str(img.get("thumbnail_url")).strip() if img.get("thumbnail_url") else None
+
+            scored.append((
+                final_score,
+                RelevantImage(
+                    title=title_val,
+                    image_url=str(img_url),
+                    thumbnail_url=thumb_val,
+                    source_url=source_val,
+                    relevance_score=final_score,
+                )
+            ))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [item[1] for item in scored[:top_k]]
+
+

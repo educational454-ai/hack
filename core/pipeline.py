@@ -15,7 +15,7 @@ from .claim_parser import parse_claim
 from .retriever import retrieve_search_candidates, retrieve_relevant_images
 from .source_filter import build_source_metadata
 from .extractor import extract_evidence_from_candidates
-from .ranker import rank_evidence_chunks
+from .ranker import rank_evidence_chunks, rank_and_filter_images
 from .evidence_gate import filter_evidence_for_verification
 from .verifier import verify_claim_evidence, VERDICT_SYMBOLS
 
@@ -104,24 +104,19 @@ def analyze_claim(claim_text: str) -> AnalysisResult:
     )
     sym, title = VERDICT_SYMBOLS[verdict]
 
-    # Retrieve relevant images for the claim
-    relevant_images = []
+    # Retrieve relevant images for the claim with semantic relevance filtering
+    relevant_images: List[RelevantImage] = []
     try:
         raw_images = retrieve_relevant_images(
-            parsed.extracted_queries[0] if parsed.extracted_queries else parsed.original_text,
-            max_images=4,
+            parsed.original_text,
+            max_images=8,
         )
-        for img in raw_images:
-            if isinstance(img, dict) and img.get("image_url"):
-                t_val = img.get("title")
-                s_val = img.get("source_url")
-                thumb_val = img.get("thumbnail_url")
-                relevant_images.append(RelevantImage(
-                    title=str(t_val).strip() if t_val else None,
-                    image_url=str(img.get("image_url")),
-                    thumbnail_url=str(thumb_val) if thumb_val else None,
-                    source_url=str(s_val).strip() if s_val else None,
-                ))
+        relevant_images = rank_and_filter_images(
+            claim=parsed.original_text,
+            raw_images=raw_images,
+            top_k=2,
+            min_threshold=0.45,
+        )
     except Exception as img_ex:
         logger.warning(f"Could not retrieve/instantiate images: {img_ex}")
 
