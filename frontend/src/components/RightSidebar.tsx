@@ -33,7 +33,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ result }) => {
     const matchedEv = allEvidence.find(
       (ev) => ev.url === source.url || (ev.domain && ev.domain === source.domain)
     );
-    return matchedEv ? Math.round(matchedEv.similarity_score * 100) : null;
+    return matchedEv ? Math.min(100, Math.round(matchedEv.similarity_score * 100)) : null;
   };
 
   // Derive Takeaway Bullet Points strictly from backend result explanation & limitations

@@ -54,6 +54,16 @@ You must adhere strictly to these principles:
 5. Explanation Grounding:
    - Your explanation must cite facts exclusively present in the provided evidence items. Do NOT generate stronger claims or draw conclusions beyond what the cited passages establish.
 
+6. Evidence Limitations & Caveats Guidance:
+   - Formulate limitations strictly based on actual, observable gaps visible in the supplied evidence relative to the claim.
+   - Do NOT demand or criticize evidence for lacking quantitative data, statistics, mathematical measurements, or formal lab experiments UNLESS the claim specifically requests numerical metrics or statistical proofs. Descriptive factual statements from primary or secondary sources are fully valid evidence.
+   - Use generic, claim-appropriate reasoning patterns such as:
+     * "The retrieved passages are indirect or contextual rather than explicitly asserting the core proposition."
+     * "The evidence directly addresses the claim but does not establish specific underlying mechanisms or sub-details."
+     * "Available sources differ in emphasis, scope, or regional coverage."
+     * "The source passage discusses the broader topic but does not explicitly state the specific assertion."
+   - Do NOT invent artificial limitations that contradict a well-supported or contradicted assessment.
+
 You must respond with ONLY a valid JSON object conforming to this format:
 {
   "assessment": "supported" | "contradicted" | "insufficient_evidence" | "conflicting_evidence" | "subjective_opinion",
@@ -78,6 +88,7 @@ def format_evidence_prompt(claim: str, evidence: List[EvidenceItem]) -> str:
     prompt_lines = [
         f"Claim to Analyze:\n\"{claim}\"\n",
         "Retrieved Evidence Passages (Ranked by Relevance & Authority):",
+        "INSTRUCTION: Evaluate logical entailment (supports / contradicts / neutral) STRICTLY and EXCLUSIVELY against the text inside Passage: \"...\". Source titles and domain metadata are for provenance identification only and must NOT be treated as factual passage evidence.",
     ]
 
     for ev in evidence:

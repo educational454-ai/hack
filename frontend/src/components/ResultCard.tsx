@@ -334,7 +334,7 @@ const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
           className="relevance-tag"
           title="BGE-M3 semantic relevance similarity match against claim text"
         >
-          {Math.round(item.similarity_score * 100)}% Relevance
+          {Math.min(100, Math.round(item.similarity_score * 100))}% Relevance
         </span>
       </div>
 
