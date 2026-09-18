@@ -52,7 +52,17 @@ def compute_lexical_similarity(claim: str, passage: str) -> float:
     if not claim_words or not passage_words:
         return 0.0
 
-    hit_count = sum(1 for w in passage_words if w in claim_words)
+    def word_match(pw: str, cw: str) -> bool:
+        if pw == cw:
+            return True
+        if len(pw) >= 3 and len(cw) >= 3:
+            if pw.startswith(cw) or cw.startswith(pw):
+                return True
+            if len(pw) >= 4 and len(cw) >= 4 and pw[:4] == cw[:4]:
+                return True
+        return False
+
+    hit_count = sum(1 for pw in passage_words if any(word_match(pw, cw) for cw in claim_words))
     # Jaccard / frequency score normalized
     overlap = hit_count / (len(claim_words) + math.log1p(len(passage_words)))
     return min(max(overlap, 0.0), 1.0)

@@ -431,14 +431,13 @@ def verify_claim_evidence(
             ["No matching records found in search retrieval."],
         )
 
-    # 3. Use Hugging Face Inference API if configured
+    # 3. Use Hugging Face Inference API
     llm_raw_result = None
-    if config.has_hf_token:
-        try:
-            logger.info(f"Calling Hugging Face LLM model: {config.hf_llm_model}...")
-            llm_raw_result = analyze_with_huggingface(parsed.original_text, evidence)
-        except Exception as e:
-            logger.warning(f"Hugging Face Inference call failed: {e}. Falling back to heuristic analysis.")
+    try:
+        logger.info(f"Calling Hugging Face LLM model: {config.hf_llm_model}...")
+        llm_raw_result = analyze_with_huggingface(parsed.original_text, evidence)
+    except Exception as e:
+        logger.warning(f"Hugging Face Inference call failed: {e}. Falling back to heuristic analysis.")
 
     # 4. Strict structured schema validation of HF response
     sanitized = _validate_and_sanitize_hf_output(llm_raw_result)
