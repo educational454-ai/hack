@@ -15,11 +15,69 @@ from .schemas import (
     SourceMetadata,
 )
 from .url_fetcher import fetch_webpage_content, WebpageFetchResult
+from .url_normalizer import are_urls_equivalent, normalize_url
 from .extractor import chunk_text_into_passages
 from .ranker import get_local_embedder, cosine_similarity, compute_lexical_similarity, re_tokenize
 from .config import config
 
 logger = logging.getLogger(__name__)
+
+
+def is_subject_page_url(cand_url: str, provided_url: str, canonical_url: Optional[str] = None) -> bool:
+    """Checks whether a candidate URL matches the exact provided webpage or canonical URL."""
+    if not cand_url:
+        return False
+    if are_urls_equivalent(cand_url, provided_url):
+        return True
+    if canonical_url and are_urls_equivalent(cand_url, canonical_url):
+        return True
+    return False
+
+
+def resolve_contextual_question(user_question: str, passages: List[str]) -> Optional[str]:
+    """Resolves contextual/ambiguous user questions into concrete propositions using page passages.
+
+    If the question is already direct and self-contained (e.g., 'Is Zendaya unmarried?'),
+    returns the question directly.
+    If contextual (e.g., 'Is this marriage confirmed?'), uses page context to extract the subject/event proposition.
+    If question is ambiguous and page context is insufficient, returns None.
+    """
+    q_clean = user_question.strip()
+    if not q_clean:
+        return None
+
+    # Check if question contains pronouns/contextual references needing resolution
+    contextual_markers = [
+        r"\b(this|these|that|those)\b",
+        r"\b(here|reported|mentioned|above|article|page|post)\b",
+        r"^\s*(did\s+this|is\s+this|was\s+this|has\s+this)\b",
+    ]
+    is_contextual = any(re.search(pat, q_clean.lower()) for pat in contextual_markers)
+
+    if not is_contextual:
+        return q_clean
+
+    # Question is contextual: must use page passages to resolve the subject proposition
+    if not passages:
+        return None
+
+    combined_context = " ".join(passages[:2])
+    sentences = [s.strip() for s in re.split(r"\n+|\. ", combined_context) if len(s.strip().split()) >= 6]
+    if not sentences:
+        return None
+
+    best_sentence = sentences[0]
+    best_sim = -1.0
+    for s in sentences:
+        sim = compute_lexical_similarity(q_clean, s)
+        if sim > best_sim:
+            best_sim = sim
+            best_sentence = s
+
+    if len(best_sentence.split()) >= 5:
+        return best_sentence
+
+    return None
 
 
 def detect_input_mode(input_text: str) -> Tuple[str, Optional[str], Optional[str]]:
@@ -131,23 +189,44 @@ def analyze_url_with_question(
         passages = chunk_text_into_passages(fetch_res.main_text)
         relevant_passages = rank_page_passages_for_question(user_question, passages, top_k=3)
 
-    # Independent Web Verification of the user question
-    independent_result = analyze_claim_fn(user_question)
+    # Resolve contextual proposition
+    resolved_proposition = resolve_contextual_question(user_question, relevant_passages)
+
+    if not resolved_proposition:
+        elapsed = round(time.time() - start_time, 2)
+        return AnalysisResult(
+            claim=user_question,
+            claim_type=ClaimType.FACTUAL,
+            verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
+            verdict_symbol="🟡",
+            verdict_title="INSUFFICIENT EVIDENCE",
+            confidence_score=0.4,
+            explanation=f"The question '{user_question}' is contextual, but the provided webpage context did not contain sufficient information to identify the specific subject or event.",
+            evidence_limitations=["The question could not be reliably resolved from the provided webpage context."],
+            latency_seconds=elapsed,
+            mode="url_question",
+            webpage=webpage_meta,
+            user_question=user_question,
+            relevant_page_context=relevant_passages,
+        )
+
+    # Independent Web Verification of the resolved proposition
+    independent_result = analyze_claim_fn(resolved_proposition)
 
     # Formulate targeted answer grounded in independent evidence
     verdict = independent_result.verdict
     q_clean = user_question.rstrip("?.! ").strip()
 
     if verdict == AssessmentVerdict.SUPPORTED:
-        targeted_answer = f"Independent evidence supports the proposition: '{q_clean}'."
+        targeted_answer = f"Independent evidence supports the proposition: '{resolved_proposition}'."
     elif verdict == AssessmentVerdict.CONTRADICTED:
-        targeted_answer = f"Independent evidence contradicts the proposition: '{q_clean}'."
+        targeted_answer = f"Independent evidence contradicts the proposition: '{resolved_proposition}'."
     elif verdict == AssessmentVerdict.CONFLICTING_EVIDENCE:
-        targeted_answer = f"Independent reporting presents conflicting accounts regarding '{q_clean}'."
+        targeted_answer = f"Independent reporting presents conflicting accounts regarding '{resolved_proposition}'."
     elif verdict == AssessmentVerdict.SUBJECTIVE_OPINION:
         targeted_answer = f"The query '{user_question}' expresses a subjective opinion or narrative perspective rather than an empirical fact."
     else:
-        targeted_answer = f"Available independent sources do not provide sufficient conclusive evidence regarding '{q_clean}'."
+        targeted_answer = f"Available independent sources do not provide sufficient conclusive evidence regarding '{resolved_proposition}'."
 
     limitations = list(independent_result.evidence_limitations)
     if not fetch_res.is_success:
@@ -155,22 +234,28 @@ def analyze_url_with_question(
     elif not relevant_passages:
         limitations.append("The provided webpage did not contain passages with sufficient semantic relevance to the user's specific question.")
 
-    # Page Context Isolation: Ensure the analyzed webpage is NOT inserted as an independent evidence item
-    filtered_supp = [e for e in independent_result.supporting_evidence if fetch_res.domain not in e.domain]
-    filtered_cont = [e for e in independent_result.contradicting_evidence if fetch_res.domain not in e.domain]
+    # Exact Subject Page Exclusion (NOT domain-wide exclusion)
+    filtered_supp = [
+        e for e in independent_result.supporting_evidence
+        if not is_subject_page_url(e.url, url, fetch_res.canonical_url)
+    ]
+    filtered_cont = [
+        e for e in independent_result.contradicting_evidence
+        if not is_subject_page_url(e.url, url, fetch_res.canonical_url)
+    ]
 
     elapsed = round(time.time() - start_time, 2)
 
     return AnalysisResult(
-        claim=user_question,
+        claim=resolved_proposition,
         claim_type=independent_result.claim_type,
         verdict=independent_result.verdict,
         verdict_symbol=independent_result.verdict_symbol,
         verdict_title=independent_result.verdict_title,
         confidence_score=independent_result.confidence_score,
         explanation=independent_result.explanation,
-        supporting_evidence=filtered_supp or independent_result.supporting_evidence,
-        contradicting_evidence=filtered_cont or independent_result.contradicting_evidence,
+        supporting_evidence=filtered_supp,
+        contradicting_evidence=filtered_cont,
         evidence_limitations=limitations,
         all_sources=independent_result.all_sources,
         relevant_images=independent_result.relevant_images,

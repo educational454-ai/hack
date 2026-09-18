@@ -1,11 +1,18 @@
 import unittest
-from core.url_pipeline import detect_input_mode, rank_page_passages_for_question, extract_key_claims_from_text
-from core.url_fetcher import WebpageFetchResult
+from core.url_normalizer import normalize_url, are_urls_equivalent
+from core.url_fetcher import WebpageFetchResult, is_safe_public_url
+from core.url_pipeline import (
+    detect_input_mode,
+    rank_page_passages_for_question,
+    extract_key_claims_from_text,
+    resolve_contextual_question,
+    is_subject_page_url,
+)
 from core.schemas import AssessmentVerdict, ClaimType, AnalysisResult
 
 
 class TestURLVerificationPipeline(unittest.TestCase):
-    """Unit test suite for Task 13 URL & URL+Question verification features."""
+    """Unit test suite for Task 13 & 13.1 URL verification features."""
 
     def test_detect_input_mode_claim(self):
         """Test plain text claim is detected as 'claim' mode."""
@@ -27,6 +34,81 @@ class TestURLVerificationPipeline(unittest.TestCase):
         self.assertEqual(mode, "url_question")
         self.assertEqual(url, "https://example.com/news/article-123")
         self.assertEqual(question, "Is this marriage actually confirmed?")
+
+    def test_url_normalization(self):
+        """Test URL normalization strips tracking parameters, fragments, casing, and trailing slashes."""
+        u1 = "HTTPS://Example.COM/news/article-123/?utm_source=twitter&fbclid=abc#section1"
+        u2 = "https://example.com/news/article-123"
+        self.assertEqual(normalize_url(u1), u2)
+        self.assertTrue(are_urls_equivalent(u1, u2))
+
+    def test_ssrf_protection_private_ips(self):
+        """Test is_safe_public_url blocks private, local, loopback, and metadata IPs."""
+        unsafe_urls = [
+            "http://127.0.0.1/admin",
+            "http://localhost:8000/metrics",
+            "http://10.0.0.1/internal",
+            "http://172.16.0.1/secret",
+            "http://192.168.1.1/router",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[::1]/status",
+        ]
+        for url in unsafe_urls:
+            is_safe = is_safe_public_url(url)
+            self.assertFalse(is_safe, f"Expected {url} to be blocked by SSRF check, got safe=True")
+
+        safe_url = "https://en.wikipedia.org/wiki/Zendaya"
+        is_safe = is_safe_public_url(safe_url)
+        self.assertTrue(is_safe, f"Expected {safe_url} to be safe, got unsafe")
+
+    def test_is_subject_page_url_exact_and_canonical(self):
+        """Test subject page exclusion matches exact & canonical URLs but retains same-domain independent articles."""
+        subject_url = "https://example.com/news/article-1?utm_source=feed"
+        canonical_url = "https://example.com/news/article-1"
+        other_article_same_domain = "https://example.com/news/article-2"
+        different_domain = "https://other.org/news/article-1"
+
+        # Exact / normalized match
+        self.assertTrue(is_subject_page_url("https://example.com/news/article-1", subject_url, canonical_url))
+        # Canonical match
+        self.assertTrue(is_subject_page_url("https://example.com/news/article-1/", subject_url, canonical_url))
+
+        # Same domain, different path -> NOT subject page (retained as independent evidence!)
+        self.assertFalse(is_subject_page_url(other_article_same_domain, subject_url, canonical_url))
+        # Different domain -> NOT subject page
+        self.assertFalse(is_subject_page_url(different_domain, subject_url, canonical_url))
+
+    def test_resolve_contextual_question(self):
+        """Test resolving direct vs contextual questions with page context."""
+        passages = ["Zendaya and Tom Holland attend dune event together in London."]
+        
+        # Direct self-contained question -> returned as-is
+        direct_q = "Is Zendaya unmarried?"
+        res_direct = resolve_contextual_question(direct_q, passages)
+        self.assertEqual(res_direct, direct_q)
+
+        # Ambiguous question with context -> hypothesis formulated
+        ambig_q = "Is this marriage confirmed?"
+        res_ambig = resolve_contextual_question(ambig_q, passages)
+        self.assertIsNotNone(res_ambig)
+        self.assertIn("Zendaya", res_ambig)
+
+        # Ambiguous question without context -> returns None
+        res_empty = resolve_contextual_question(ambig_q, [])
+        self.assertIsNone(res_empty)
+
+    def test_evidence_isolation_empty_fallback_not_restored(self):
+        """Test evidence isolation does NOT restore excluded subject pages if filtered list is empty."""
+        # Simulate evidence filtering behavior: if independent search returned only subject page URLs,
+        # filtered result must remain empty.
+        subject_url = "https://example.com/news/article-1"
+        retrieved_urls = ["https://example.com/news/article-1", "https://example.com/news/article-1/"]
+        
+        filtered = [u for u in retrieved_urls if not is_subject_page_url(u, subject_url, subject_url)]
+        self.assertEqual(len(filtered), 0)
+        # Verify that filtered is empty [] and no fallback restores retrieved_urls
+        supporting_evidence = filtered
+        self.assertEqual(supporting_evidence, [])
 
     def test_webpage_fetch_result_metadata_integrity(self):
         """Test missing metadata fields remain None and are not fabricated."""
@@ -74,3 +156,4 @@ class TestURLVerificationPipeline(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

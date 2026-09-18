@@ -10,7 +10,39 @@ from bs4 import BeautifulSoup
 from .source_filter import extract_domain
 from .extractor import clean_html_to_text, HEADERS
 
+import ipaddress
+from socket import gethostbyname
+
 logger = logging.getLogger(__name__)
+
+BLOCKED_HOSTNAMES = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "::"}
+
+
+def is_safe_public_url(url: str) -> bool:
+    """Validates URL against SSRF threats (localhost, RFC1918 private ranges, loopback)."""
+    try:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower().strip()
+
+        if not hostname or hostname in BLOCKED_HOSTNAMES:
+            return False
+
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+        except ValueError:
+            try:
+                ip_str = gethostbyname(hostname)
+                ip = ipaddress.ip_address(ip_str)
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                    return False
+            except Exception:
+                pass
+
+        return True
+    except Exception:
+        return False
 
 
 class WebpageFetchResult:
@@ -52,6 +84,14 @@ def fetch_webpage_content(url: str, timeout: float = 6.0) -> WebpageFetchResult:
     clean_url = url.strip()
     if not clean_url.startswith(("http://", "https://")):
         clean_url = "https://" + clean_url
+
+    if not is_safe_public_url(clean_url):
+        return WebpageFetchResult(
+            url=clean_url,
+            domain="restricted",
+            status_code=403,
+            error_message="Access denied: URL targets a private or internal network address (SSRF protection).",
+        )
 
     domain = extract_domain(clean_url)
     if not domain:
