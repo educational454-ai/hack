@@ -13,7 +13,7 @@ from .schemas import (
 )
 from .claim_parser import parse_claim
 from .retriever import retrieve_search_candidates, retrieve_relevant_images
-from .source_filter import build_source_metadata
+from .source_filter import build_source_metadata, extract_domain
 from .extractor import extract_evidence_from_candidates
 from .ranker import rank_evidence_chunks
 from .evidence_gate import filter_evidence_for_verification
@@ -113,11 +113,16 @@ def analyze_claim(claim_text: str) -> AnalysisResult:
         )
         for img in raw_images:
             if isinstance(img, dict) and img.get("image_url"):
+                source_u = str(img.get("source_url") or img.get("image_url"))
+                dom_val = extract_domain(source_u)
+                rel_sc = img.get("relevance_score")
                 relevant_images.append(RelevantImage(
                     title=str(img.get("title") or "Related Image"),
                     image_url=str(img.get("image_url")),
                     thumbnail_url=str(img.get("thumbnail_url") or img.get("image_url")),
-                    source_url=str(img.get("source_url") or img.get("image_url")),
+                    source_url=source_u,
+                    domain=dom_val if dom_val else None,
+                    relevance_score=float(rel_sc) if isinstance(rel_sc, (int, float)) and not isinstance(rel_sc, bool) else None,
                 ))
     except Exception as img_ex:
         logger.warning(f"Could not retrieve/instantiate images: {img_ex}")
