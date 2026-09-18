@@ -49,7 +49,7 @@ An **evidence-first** misinformation detection and verification engine. Unlike t
 1. **Multi-Mode Input Support**:
    - **Claim Mode**: Analyzes plain-text factual or opinion statements (e.g., *"India banned UPI in 2025"*).
    - **URL-Only Mode**: Fetches a public webpage, extracts bounded key factual claims, and evaluates an article-level verification overview.
-   - **URL + Question Mode**: Uses webpage context to ground user questions (e.g., *"https://example.com/article\nIs this marriage confirmed?"*), while performing independent verification search that isolates the subject webpage.
+   - **URL + Question Mode**: Uses webpage context to ground user questions, while performing independent verification search that isolates the subject webpage.
 
 2. **Authoritative Source Tiering**:
    - **Primary**: Official government bureaus (`.gov`, `.gov.in`, PIB, RBI, legal courts) and peer-reviewed scientific databases.
