@@ -16,6 +16,7 @@ from .retriever import retrieve_search_candidates, retrieve_relevant_images
 from .source_filter import build_source_metadata
 from .extractor import extract_evidence_from_candidates
 from .ranker import rank_evidence_chunks
+from .evidence_gate import filter_evidence_for_verification
 from .verifier import verify_claim_evidence, VERDICT_SYMBOLS
 
 logger = logging.getLogger(__name__)
@@ -90,18 +91,36 @@ def analyze_claim(claim_text: str) -> AnalysisResult:
     )
     logger.info(f"Selected top {len(ranked_evidence)} most relevant evidence chunks.")
 
+    # Step 5.5: Evidence Quality Gate
+    usable_evidence, rejected_evidence = filter_evidence_for_verification(ranked_evidence)
+    logger.info(
+        f"Evidence Quality Gate: retained {len(usable_evidence)} usable evidence items, "
+        f"filtered out {len(rejected_evidence)} items."
+    )
+
     # Step 6 & 7: Claim <-> Evidence Comparative Verification (HF LLM)
     verdict, conf, expl, supp, cont, limits = verify_claim_evidence(
-        parsed, ranked_evidence
+        parsed, usable_evidence
     )
     sym, title = VERDICT_SYMBOLS[verdict]
 
     # Retrieve relevant images for the claim
-    raw_images = retrieve_relevant_images(
-        parsed.extracted_queries[0] if parsed.extracted_queries else parsed.original_text,
-        max_images=4,
-    )
-    relevant_images = [RelevantImage(**img) for img in raw_images]
+    relevant_images = []
+    try:
+        raw_images = retrieve_relevant_images(
+            parsed.extracted_queries[0] if parsed.extracted_queries else parsed.original_text,
+            max_images=4,
+        )
+        for img in raw_images:
+            if isinstance(img, dict) and img.get("image_url"):
+                relevant_images.append(RelevantImage(
+                    title=str(img.get("title") or "Related Image"),
+                    image_url=str(img.get("image_url")),
+                    thumbnail_url=str(img.get("thumbnail_url") or img.get("image_url")),
+                    source_url=str(img.get("source_url") or img.get("image_url")),
+                ))
+    except Exception as img_ex:
+        logger.warning(f"Could not retrieve/instantiate images: {img_ex}")
 
     elapsed = round(time.time() - start_time, 2)
     logger.info(f"Completed analysis in {elapsed}s with verdict: {title} ({sym})")

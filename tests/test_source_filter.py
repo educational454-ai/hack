@@ -25,7 +25,7 @@ class TestSourceFilter(unittest.TestCase):
     def test_secondary_source_classification(self):
         tier, _, weight = classify_source("https://www.reuters.com/world/india/news")
         self.assertEqual(tier, SourceTier.SECONDARY)
-        self.assertTrue(weight >= 0.8)
+        self.assertEqual(weight, 0.85)
 
         tier2, _, _ = classify_source("https://thehindu.com/news/national")
         self.assertEqual(tier2, SourceTier.SECONDARY)
@@ -33,10 +33,54 @@ class TestSourceFilter(unittest.TestCase):
     def test_low_confidence_source_classification(self):
         tier, _, weight = classify_source("https://www.reddit.com/r/india/comments/xyz")
         self.assertEqual(tier, SourceTier.LOW_CONFIDENCE)
-        self.assertTrue(weight <= 0.5)
+        self.assertEqual(weight, 0.4)
 
         tier2, _, _ = classify_source("https://somemediablog.blogspot.com/post")
         self.assertEqual(tier2, SourceTier.LOW_CONFIDENCE)
+
+    def test_unknown_unclassified_domain_becomes_low_confidence(self):
+        tier, _, weight = classify_source("https://unknown-commercial-blog.com/post")
+        self.assertEqual(tier, SourceTier.LOW_CONFIDENCE)
+        self.assertEqual(weight, 0.4)
+
+        tier2, _, _ = classify_source("https://random-store.net")
+        self.assertEqual(tier2, SourceTier.LOW_CONFIDENCE)
+
+        tier3, _, _ = classify_source("https://some-unlisted-site.org")
+        self.assertEqual(tier3, SourceTier.LOW_CONFIDENCE)
+
+    def test_legitimate_subdomain_classification(self):
+        tier, _, _ = classify_source("https://world.reuters.com/article/123")
+        self.assertEqual(tier, SourceTier.SECONDARY)
+
+        tier2, _, _ = classify_source("https://press.pib.gov.in/page")
+        self.assertEqual(tier2, SourceTier.PRIMARY)
+
+        tier3, _, _ = classify_source("https://sub.arxiv.org/abs/2301.00000")
+        self.assertEqual(tier3, SourceTier.PRIMARY)
+
+    def test_substring_domain_not_misclassified(self):
+        tier, _, _ = classify_source("https://notreuters.com/article/123")
+        self.assertEqual(tier, SourceTier.LOW_CONFIDENCE)
+
+        tier2, _, _ = classify_source("https://reuters.com.attacker.com/article/123")
+        self.assertEqual(tier2, SourceTier.LOW_CONFIDENCE)
+
+        tier3, _, _ = classify_source("https://notreddit.com/post")
+        self.assertEqual(tier3, SourceTier.LOW_CONFIDENCE)
+
+        tier4, _, _ = classify_source("https://fake-arxiv.org/paper")
+        self.assertEqual(tier4, SourceTier.LOW_CONFIDENCE)
+
+    def test_malformed_and_invalid_hostname_handling(self):
+        tier1, _, _ = classify_source("")
+        self.assertEqual(tier1, SourceTier.LOW_CONFIDENCE)
+
+        tier2, _, _ = classify_source("not_a_valid_url")
+        self.assertEqual(tier2, SourceTier.LOW_CONFIDENCE)
+
+        tier3, _, _ = classify_source(None)
+        self.assertEqual(tier3, SourceTier.LOW_CONFIDENCE)
 
 
 if __name__ == "__main__":

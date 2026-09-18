@@ -7,7 +7,7 @@ Categorizes evidence sources into:
 """
 
 from urllib.parse import urlparse
-from typing import Tuple
+from typing import Tuple, Iterable
 from .schemas import SourceTier, SourceMetadata
 
 # High-authority official / primary domains & suffixes
@@ -43,15 +43,50 @@ LOW_CONFIDENCE_DOMAINS = {
 
 
 def extract_domain(url: str) -> str:
-    """Extracts the clean root domain from a URL."""
+    """Extracts the clean root domain or host from a URL safely."""
+    if not url or not isinstance(url, str):
+        return ""
     try:
-        parsed = urlparse(url)
-        netloc = parsed.netloc.lower()
+        url_str = url.strip()
+        if not url_str:
+            return ""
+        if not url_str.startswith(("http://", "https://", "ftp://")):
+            url_str = "http://" + url_str
+        parsed = urlparse(url_str)
+        netloc = (parsed.netloc or "").lower().split(":")[0].strip()
         if netloc.startswith("www."):
             netloc = netloc[4:]
         return netloc
     except Exception:
-        return url.lower()
+        return ""
+
+
+def _clean_ref_domain(ref: str) -> str:
+    ref_str = ref.strip().lower()
+    ref_host = ref_str.split("/")[0].split(":")[0]
+    if ref_host.startswith("www."):
+        ref_host = ref_host[4:]
+    return ref_host
+
+
+def is_in_domain_set(domain: str, domain_set: Iterable[str]) -> bool:
+    """Checks whether domain matches an exact domain or legitimate subdomain in domain_set.
+
+    Prevents unsafe substring matching (e.g. 'notreuters.com' matching 'reuters.com').
+    """
+    if not domain:
+        return False
+    cand = domain.lower()
+    if cand.startswith("www."):
+        cand = cand[4:]
+
+    for ref in domain_set:
+        ref_host = _clean_ref_domain(ref)
+        if not ref_host:
+            continue
+        if cand == ref_host or cand.endswith("." + ref_host):
+            return True
+    return False
 
 
 def classify_source(url: str, title: str = "") -> Tuple[SourceTier, str, float]:
@@ -62,43 +97,44 @@ def classify_source(url: str, title: str = "") -> Tuple[SourceTier, str, float]:
     """
     domain = extract_domain(url)
 
+    if not domain:
+        return (
+            SourceTier.LOW_CONFIDENCE,
+            "Low-confidence source: Unknown or unclassified web publication.",
+            0.4,
+        )
+
     # 1. Check Primary indicators
-    if domain in PRIMARY_DOMAINS or any(domain.endswith(tld) for tld in PRIMARY_TLDS):
+    if is_in_domain_set(domain, PRIMARY_DOMAINS) or any(
+        domain == tld[1:] or domain.endswith(tld) for tld in PRIMARY_TLDS
+    ):
         return (
             SourceTier.PRIMARY,
             "Primary source: Official government authority, academic publication, or recognized legal repository.",
             1.0,
         )
 
-    # 2. Check Low-Confidence indicators
-    if any(low in domain for low in LOW_CONFIDENCE_DOMAINS):
+    # 2. Check Low-Confidence indicators (explicitly listed low-confidence domains)
+    if is_in_domain_set(domain, LOW_CONFIDENCE_DOMAINS):
         return (
             SourceTier.LOW_CONFIDENCE,
             "Low-confidence source: User-generated content platform, forum, or unvetted blog.",
             0.4,
         )
 
-    # 3. Check Secondary indicators
-    if any(sec in domain for sec in SECONDARY_DOMAINS):
+    # 3. Check Secondary indicators (explicitly listed recognized secondary domains)
+    if is_in_domain_set(domain, SECONDARY_DOMAINS):
         return (
             SourceTier.SECONDARY,
             "Secondary source: Established journalistic outlet, news agency, or recognized fact-checking organization.",
             0.85,
         )
 
-    # 4. Fallback: Check if it's a general .org or news site
-    if domain.endswith(".org"):
-        return (
-            SourceTier.SECONDARY,
-            "Secondary source: Institutional or non-profit organization domain.",
-            0.75,
-        )
-
-    # Default general web source
+    # 4. Fallback for unclassified / unknown domains: treat conservatively as LOW_CONFIDENCE
     return (
-        SourceTier.SECONDARY,
-        "Secondary source: General web publication or news portal.",
-        0.70,
+        SourceTier.LOW_CONFIDENCE,
+        "Low-confidence source: Unknown or unclassified web publication.",
+        0.4,
     )
 
 

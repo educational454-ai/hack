@@ -9,6 +9,10 @@ from core.config import config
 from core.pipeline import analyze_claim
 from core.schemas import AnalysisResult
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="Evidence-First AI Misinformation Analyzer",
     description="Multi-stage evidence-grounded verification API powered by Hugging Face models and BGE-M3.",
@@ -64,4 +68,5 @@ def analyze(req: AnalyzeRequest):
         result = analyze_claim(claim_text)
         return result
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Pipeline error: {str(exc)}")
+        logger.error(f"Pipeline execution error: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred while processing the verification pipeline.")

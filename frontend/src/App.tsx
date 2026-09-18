@@ -3,6 +3,8 @@ import { Header } from "./components/Header";
 import { ClaimInput } from "./components/ClaimInput";
 import { PipelineSteps } from "./components/PipelineSteps";
 import { ResultCard } from "./components/ResultCard";
+import { LeftSidebar } from "./components/LeftSidebar";
+import { RightSidebar } from "./components/RightSidebar";
 import { analyzeClaimAPI } from "./api";
 import { AnalysisResult } from "./types";
 import { AlertCircle } from "lucide-react";
@@ -37,23 +39,31 @@ export const App: React.FC = () => {
     <div className="app-container">
       <Header />
 
-      <ClaimInput
-        claim={claim}
-        setClaim={setClaim}
-        onAnalyze={handleAnalyze}
-        isLoading={isLoading}
-      />
+      <div className="app-layout">
+        <LeftSidebar />
 
-      {error && (
-        <div className="error-banner">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
+        <main className="main-content">
+          <ClaimInput
+            claim={claim}
+            setClaim={setClaim}
+            onAnalyze={handleAnalyze}
+            isLoading={isLoading}
+          />
 
-      <PipelineSteps isLoading={isLoading} />
+          {error && (
+            <div className="error-banner">
+              <AlertCircle size={20} />
+              <span>{error}</span>
+            </div>
+          )}
 
-      {result && <ResultCard result={result} />}
+          <PipelineSteps isLoading={isLoading} />
+
+          {result && <ResultCard result={result} />}
+        </main>
+
+        <RightSidebar result={result} />
+      </div>
     </div>
   );
 };

@@ -5,12 +5,11 @@ import {
   AlertTriangle,
   XCircle,
   CheckCircle2,
-  Globe,
+  HelpCircle,
 } from "lucide-react";
 import {
   AnalysisResult,
   EvidenceItem,
-  SourceMetadata,
 } from "../types";
 
 interface ResultCardProps {
@@ -28,7 +27,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
 
   return (
     <div className="result-container">
-      {/* 1. Verdict Banner (Removed factual tag as requested) */}
+      {/* 1. Verdict Banner */}
       <div className={`verdict-banner ${result.verdict}`}>
         <div className="verdict-left">
           <span className="verdict-emoji">{result.verdict_symbol}</span>
@@ -39,8 +38,11 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
 
         <div className="verdict-meta">
-          <span className="meta-pill">
-            Confidence: {Math.round(result.confidence_score * 100)}%
+          <span
+            className="meta-pill"
+            title="Internal model verification confidence score (not a probability of truth)"
+          >
+            Verification Confidence: {Math.round(result.confidence_score * 100)}%
           </span>
           {result.latency_seconds && (
             <span className="meta-pill">{result.latency_seconds}s</span>
@@ -48,7 +50,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       </div>
 
-      {/* 2. Why? Evidence Synthesis (First as requested) */}
+      {/* 2. Why? Evidence Synthesis */}
       <div className="explanation-card">
         <h3 className="card-heading">
           <BookOpen size={19} className="heading-icon" />
@@ -57,7 +59,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         <p className="explanation-text">{result.explanation}</p>
       </div>
 
-      {/* 3. Summary Evidence Cards (3 cards per row, max 2 rows, expandable details) */}
+      {/* 3. Summary Evidence Cards */}
       {!isSubjective && summaryEvidence.length > 0 && (
         <div className="card-section">
           <h3 className="card-heading">
@@ -72,20 +74,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       )}
 
-      {/* 4. Relevant Resources Card with direct links to actual articles */}
-      {result.all_sources && result.all_sources.length > 0 && (
-        <div className="card-section">
-          <h3 className="card-heading">
-            <Globe size={19} className="heading-icon" />
-            Relevant Resources ({result.all_sources.length})
-          </h3>
-          <div className="sources-grid">
-            {result.all_sources.map((src, idx) => (
-              <SourceResourceCard key={idx} source={src} />
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* 5. Evidence Limitations */}
       {result.evidence_limitations && result.evidence_limitations.length > 0 && (
@@ -105,28 +94,46 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
   );
 };
 
-/* --- Summary Evidence Card with Direct Link to Official Site --- */
+/* --- Summary Evidence Card --- */
 const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
-  const isContradicting = item.stance === "contradicts";
+  const stance = item.stance || "neutral";
+  const isContradicting = stance === "contradicts";
+  const isSupporting = stance === "supports";
+
+  const tierLabelMap: Record<string, string> = {
+    primary: "Primary Source",
+    secondary: "Secondary Source",
+    low_confidence: "Lower Confidence Source",
+  };
+  const tierDisplay = tierLabelMap[item.source_tier] || item.source_tier;
 
   return (
     <div className="summary-ev-card">
       <div className="summary-ev-header">
         <span
-          className={`stance-tag ${isContradicting ? "contradicts" : "supports"}`}
+          className={`stance-tag ${
+            isContradicting ? "contradicts" : isSupporting ? "supports" : "neutral"
+          }`}
         >
           {isContradicting ? (
             <>
               <XCircle size={12} /> Contradicts
             </>
-          ) : (
+          ) : isSupporting ? (
             <>
               <CheckCircle2 size={12} /> Supports
             </>
+          ) : (
+            <>
+              <HelpCircle size={12} /> Neutral Context
+            </>
           )}
         </span>
-        <span className="relevance-tag">
-          {Math.round(item.similarity_score * 100)}% Match
+        <span
+          className="relevance-tag"
+          title="BGE-M3 semantic relevance similarity match against claim text"
+        >
+          {Math.round(item.similarity_score * 100)}% Relevance
         </span>
       </div>
 
@@ -135,39 +142,28 @@ const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
       </p>
 
       <div className="summary-ev-footer">
-        <span className="summary-domain">{item.domain}</span>
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="details-toggle-btn"
-          title="Open official source article"
-        >
-          View details <ExternalLink size={12} />
-        </a>
+        <span className="summary-domain" title={tierDisplay}>
+          {item.domain}
+        </span>
+        {item.url ? (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="details-toggle-btn"
+            title="Open official source article"
+          >
+            View details <ExternalLink size={12} />
+          </a>
+        ) : (
+          <span className="details-toggle-btn disabled">
+            No URL
+          </span>
+        )}
       </div>
     </div>
   );
 };
 
-/* --- Relevant Resource Card with Direct Article Link --- */
-const SourceResourceCard: React.FC<{ source: SourceMetadata }> = ({
-  source,
-}) => {
-  return (
-    <a
-      href={source.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="resource-card"
-    >
-      <div className="resource-header">
-        <span className={`tier-badge ${source.tier}`}>{source.tier}</span>
-        <ExternalLink size={13} className="resource-link-icon" />
-      </div>
-      <h5 className="resource-title">{source.title || source.domain}</h5>
-      <span className="resource-domain">{source.domain}</span>
-    </a>
-  );
-};
+
 
