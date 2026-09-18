@@ -61,10 +61,10 @@ class ParsedClaim(BaseModel):
 
 
 class RelevantImage(BaseModel):
-    title: str
+    title: Optional[str] = None
     image_url: str
-    thumbnail_url: str
-    source_url: str
+    thumbnail_url: Optional[str] = None
+    source_url: Optional[str] = None
     relevance_score: Optional[float] = None
 
 

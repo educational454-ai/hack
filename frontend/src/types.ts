@@ -32,10 +32,10 @@ export interface EvidenceItem {
 }
 
 export interface RelevantImage {
-  title: string;
+  title?: string | null;
   image_url: string;
-  thumbnail_url: string;
-  source_url: string;
+  thumbnail_url?: string | null;
+  source_url?: string | null;
   relevance_score?: number | null;
 }
 

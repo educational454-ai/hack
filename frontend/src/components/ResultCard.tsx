@@ -126,7 +126,7 @@ const VisualEvidenceSection: React.FC<{ images: RelevantImage[] }> = ({ images }
         img &&
         (img.image_url || img.thumbnail_url) &&
         !failedUrls[img.image_url] &&
-        !failedUrls[img.thumbnail_url]
+        !(img.thumbnail_url && failedUrls[img.thumbnail_url])
     )
     .slice(0, 2);
 
@@ -147,8 +147,8 @@ const VisualEvidenceSection: React.FC<{ images: RelevantImage[] }> = ({ images }
       <div className="visual-evidence-grid">
         {validImages.map((img, idx) => {
           const displayUrl = img.thumbnail_url || img.image_url;
-          const targetUrl = img.source_url || img.image_url;
-          const domain = extractDomain(targetUrl);
+          const targetUrl = img.source_url && img.source_url.trim() ? img.source_url.trim() : undefined;
+          const domain = targetUrl ? extractDomain(targetUrl) : "";
           const altText = img.title || "Retrieved visual evidence";
 
           return (
@@ -162,11 +162,13 @@ const VisualEvidenceSection: React.FC<{ images: RelevantImage[] }> = ({ images }
                 />
               </div>
               <div className="visual-card-body">
-                <h4 className="visual-card-title" title={img.title}>
-                  {img.title || "Related Web Article"}
-                </h4>
+                {img.title ? (
+                  <h4 className="visual-card-title" title={img.title}>
+                    {img.title}
+                  </h4>
+                ) : null}
                 <div className="visual-card-footer">
-                  <span className="visual-domain">{domain}</span>
+                  {domain ? <span className="visual-domain">{domain}</span> : null}
                   {img.relevance_score != null ? (
                     <span className="visual-relevance">
                       Image relevance: {Math.round(img.relevance_score <= 1 ? img.relevance_score * 100 : img.relevance_score)}%
@@ -179,7 +181,7 @@ const VisualEvidenceSection: React.FC<{ images: RelevantImage[] }> = ({ images }
                       rel="noopener noreferrer"
                       className="details-toggle-btn"
                       title="View original article source"
-                      aria-label={`Open source article on ${domain}`}
+                      aria-label={domain ? `Open source article on ${domain}` : "Open source article"}
                     >
                       Source <ExternalLink size={12} />
                     </a>

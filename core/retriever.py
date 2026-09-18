@@ -59,9 +59,9 @@ def retrieve_search_candidates(queries: List[str], max_results: int = 8) -> List
     return candidate_results
 
 
-def retrieve_relevant_images(query: str, max_images: int = 4) -> List[Dict[str, str]]:
+def retrieve_relevant_images(query: str, max_images: int = 4) -> List[Dict[str, Any]]:
     """Retrieves high-relevance news/topic images using DDGS."""
-    images: List[Dict[str, str]] = []
+    images: List[Dict[str, Any]] = []
     try:
         from ddgs import DDGS
         ddgs_client = DDGS()
@@ -81,11 +81,14 @@ def retrieve_relevant_images(query: str, max_images: int = 4) -> List[Dict[str, 
                     continue
                 img_url = item.get("image") or item.get("image_url")
                 if img_url:
+                    title_val = item.get("title")
+                    source_val = item.get("url") or item.get("source")
+                    thumb_val = item.get("thumbnail") or img_url
                     images.append({
-                        "title": str(item.get("title") or "Related Image"),
+                        "title": str(title_val).strip() if title_val else None,
                         "image_url": str(img_url),
-                        "thumbnail_url": str(item.get("thumbnail") or img_url),
-                        "source_url": str(item.get("url") or item.get("source") or img_url),
+                        "thumbnail_url": str(thumb_val) if thumb_val else None,
+                        "source_url": str(source_val).strip() if source_val else None,
                     })
         except Exception as e:
             logger.warning(f"Failed to retrieve images for '{query}': {e}")

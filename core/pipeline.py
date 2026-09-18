@@ -113,11 +113,14 @@ def analyze_claim(claim_text: str) -> AnalysisResult:
         )
         for img in raw_images:
             if isinstance(img, dict) and img.get("image_url"):
+                t_val = img.get("title")
+                s_val = img.get("source_url")
+                thumb_val = img.get("thumbnail_url")
                 relevant_images.append(RelevantImage(
-                    title=str(img.get("title") or "Related Image"),
+                    title=str(t_val).strip() if t_val else None,
                     image_url=str(img.get("image_url")),
-                    thumbnail_url=str(img.get("thumbnail_url") or img.get("image_url")),
-                    source_url=str(img.get("source_url") or img.get("image_url")),
+                    thumbnail_url=str(thumb_val) if thumb_val else None,
+                    source_url=str(s_val).strip() if s_val else None,
                 ))
     except Exception as img_ex:
         logger.warning(f"Could not retrieve/instantiate images: {img_ex}")

@@ -1233,7 +1233,8 @@ body {
   flex-direction: column;
 }
 
-.visual-disclaimer {
+.visual-disclaimer,
+.visual-evidence-disclaimer {
   font-size: 0.76rem;
   color: var(--text-muted);
   line-height: 1.4;
