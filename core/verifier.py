@@ -212,6 +212,8 @@ def analyze_with_huggingface(
     """Runs the Hugging Face InferenceClient chat completion for evidence verification."""
     from huggingface_hub import InferenceClient
 
+    token_len = len(config.hf_token or "")
+    logger.info(f"[HF Audit] Initializing InferenceClient (token_len={token_len}, model={config.hf_llm_model})")
     client = InferenceClient(token=config.hf_token)
     user_prompt = format_evidence_prompt(claim, evidence)
 
@@ -220,15 +222,25 @@ def analyze_with_huggingface(
         {"role": "user", "content": user_prompt},
     ]
 
-    response = client.chat_completion(
-        messages=messages,
-        model=config.hf_llm_model,
-        max_tokens=900,
-        temperature=0.1,
-    )
-
-    content = response.choices[0].message.content
-    return parse_llm_json(content)
+    logger.info(f"[HF Audit] Sending chat completion request to model '{config.hf_llm_model}' (prompt_len={len(user_prompt)})...")
+    try:
+        response = client.chat_completion(
+            messages=messages,
+            model=config.hf_llm_model,
+            max_tokens=900,
+            temperature=0.1,
+        )
+        content = response.choices[0].message.content or ""
+        logger.info(f"[HF Audit] Received response from model '{config.hf_llm_model}' (response_len={len(content)})")
+        parsed_json = parse_llm_json(content)
+        if parsed_json is None:
+            logger.warning(f"[HF Audit] Failed to parse JSON from HF output (prefix: '{content[:120]}...')")
+        else:
+            logger.info(f"[HF Audit] Successfully parsed JSON from HF output: assessment={parsed_json.get('assessment')}")
+        return parsed_json
+    except Exception as exc:
+        logger.warning(f"[HF Audit] API request failed for model '{config.hf_llm_model}': {type(exc).__name__}: {exc}")
+        raise
 
 
 def analyze_with_heuristics(
@@ -325,19 +337,27 @@ def _validate_llm_provenance(
         reasoning = str(raw_eval.get("reasoning", "")).strip()
 
         matched_item: Optional[EvidenceItem] = None
+        clean_id = raw_id.lower().replace("[", "").replace("]", "").replace("id:", "").strip()
 
-        # 1. Match by ID
+        # 1. Match by ID or clean_id
         if raw_id in id_map:
             matched_item = id_map[raw_id]
+        elif clean_id in id_map:
+            matched_item = id_map[clean_id]
         elif raw_id.lower() in id_map:
             matched_item = id_map[raw_id.lower()]
-        # 2. Match by numeric index (e.g. "1" or 1 or "ev_1")
+        # 2. Match by numeric index (e.g. "1" or 1 or "ev_1" or "ev1" or "passage 1")
         elif raw_id.isdigit() and int(raw_id) in index_map:
             matched_item = index_map[int(raw_id)]
         elif raw_id.lower().startswith("ev_") and raw_id[3:].isdigit() and int(raw_id[3:]) in index_map:
             matched_item = index_map[int(raw_id[3:])]
+        else:
+            digits = re.findall(r"\d+", raw_id)
+            if digits and int(digits[0]) in index_map:
+                matched_item = index_map[int(digits[0])]
+
         # 3. Match by exact URL
-        elif raw_url and raw_url in url_map:
+        if matched_item is None and raw_url and raw_url in url_map:
             matched_item = url_map[raw_url]
 
         if matched_item is not None:

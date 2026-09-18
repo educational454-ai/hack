@@ -16,25 +16,31 @@ PRIMARY_DOMAINS = {
     "sci.gov.in", "who.int", "un.org", "cdc.gov", "fda.gov", "nih.gov",
     "arxiv.org", "nature.com", "thelancet.com", "sciencedirect.com",
     "springer.com", "biorxiv.org", "pubmed.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov",
-    "isro.gov.in", "nasa.gov", "supremecourtofindia.nic.in"
+    "isro.gov.in", "nasa.gov", "supremecourtofindia.nic.in", "esa.int",
+    "incometax.gov.in", "incometaxindia.gov.in", "cbic.gov.in", "gst.gov.in"
 }
 
 PRIMARY_TLDS = (".gov", ".gov.in", ".nic.in", ".gov.uk", ".gov.au", ".edu", ".ac.in", ".ac.uk", ".mil")
 
-# Established news wire services & reporting outlets
+# Established news wire services, encyclopedias, educational portals, and reporting outlets
 SECONDARY_DOMAINS = {
     "reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "thehindu.com",
-    "indianexpress.com", "timesofindia.indiatimes.com", "ndtv.com",
+    "indianexpress.com", "timesofindia.indiatimes.com", "ndtv.com", "ndtv.in",
     "hindustantimes.com", "bloomberg.com", "wsj.com", "ft.com",
     "theguardian.com", "aljazeera.com", "afp.com", "ani.in", "pti.in",
     "altnews.in", "boomlive.in", "snopes.com", "factcheck.org", "politifact.com",
     "cnbc.com", "forbes.com", "economictimes.indiatimes.com", "business-standard.com",
     "theprint.in", "thewire.in", "scroll.in", "livemint.com", "moneycontrol.com",
     "techcrunch.com", "theverge.com", "wired.com", "arstechnica.com",
-    "nature.com/news", "sciencedaily.com"
+    "nature.com/news", "sciencedaily.com", "wikipedia.org", "en.wikipedia.org",
+    "britannica.com", "cleartax.in", "taxmann.com", "space.com", "livescience.com",
+    "scientificamerican.com", "indiatoday.in", "news18.com", "firstpost.com",
+    "financialexpress.com", "businesstoday.in", "vajiramandravi.com", "drishtiias.com",
+    "byjus.com", "toppr.com", "geeksforgeeks.org", "w3schools.com", "imdb.com",
+    "rottentomatoes.com", "variety.com", "hollywoodreporter.com", "jagranjosh.com"
 }
 
-# Low confidence, social platforms, and user-generated forums
+# Low confidence, social platforms, user-generated forums, and personal blog hosts
 LOW_CONFIDENCE_DOMAINS = {
     "reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com",
     "tiktok.com", "quora.com", "medium.com", "blogspot.com", "wordpress.com",
@@ -114,7 +120,7 @@ def classify_source(url: str, title: str = "") -> Tuple[SourceTier, str, float]:
             1.0,
         )
 
-    # 2. Check Low-Confidence indicators (explicitly listed low-confidence domains)
+    # 2. Check Low-Confidence indicators (explicitly listed social platforms / forums / user blogs)
     if is_in_domain_set(domain, LOW_CONFIDENCE_DOMAINS):
         return (
             SourceTier.LOW_CONFIDENCE,

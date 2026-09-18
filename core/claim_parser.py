@@ -6,12 +6,14 @@ from .schemas import ClaimType, ParsedClaim
 
 # Evaluative / Subjective markers
 SUBJECTIVE_PATTERNS = [
-    r"\b(best|worst|greatest|terrible|awesome|horrible|amazing|ugly|beautiful)\b",
+    r"\b(best|worst|greatest|terrible|awesome|horrible|amazing|ugly|beautiful|finest|masterpiece|trash|overrated|underrated|goat)\b",
     r"\b(protagonist|antagonist|hero|villain|savior|evil|saint)\b",
     r"\b(better than|worse than|superior to|inferior to)\b",
     r"\b(should|ought to|deserves to|has the right to)\b",
     r"\b(in my opinion|i think|i believe|i feel|personally)\b",
     r"\b(favorite|unjust|immoral|moral|righteous)\b",
+    r"^\s*(is|are|was|were|do|does)\s+.*\b(the\s+)?(best|worst|greatest|finest|most\s+\w+)\b",
+    r"\b(the\s+)?(best|worst|greatest|finest)\s+\w+\s+(ever|of all time|in history)\b",
 ]
 
 # Medical factual keywords
