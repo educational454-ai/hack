@@ -54,7 +54,7 @@ export const ClaimInput: React.FC<ClaimInputProps> = ({
           <textarea
             className="claim-textarea"
             rows={3}
-            placeholder="Paste a claim or URL, optionally add a question..."
+            placeholder="Enter information or URL..."
             value={claim}
             onChange={(e) => setClaim(e.target.value)}
             onKeyDown={handleKeyDown}
