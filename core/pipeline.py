@@ -19,23 +19,13 @@ from .ranker import rank_evidence_chunks, rank_and_filter_images
 from .evidence_gate import filter_evidence_for_verification
 from .verifier import verify_claim_evidence, VERDICT_SYMBOLS
 
+from .url_pipeline import detect_input_mode, analyze_url_with_question, analyze_url_only
+
 logger = logging.getLogger(__name__)
 
 
-def analyze_claim(claim_text: str) -> AnalysisResult:
-    """Executes the full 8-step evidence-first verification pipeline.
-
-    Workflow:
-    1. Parse Claim & determine claim type (Factual vs Subjective).
-    2. If Subjective: bypass false fact-check, provide perspectives & context.
-    3. If Factual:
-       - Multi-query search candidate retrieval.
-       - Source tiering (Primary, Secondary, Low-confidence).
-       - Passage extraction & HTML cleaning.
-       - BGE-M3 semantic similarity ranking.
-       - Claim <-> Evidence comparative analysis (via Hugging Face LLM).
-       - Non-binary transparent result compilation.
-    """
+def analyze_claim_single(claim_text: str) -> AnalysisResult:
+    """Executes the full 8-step evidence-first verification pipeline for a single claim string."""
     start_time = time.time()
     logger.info(f"Starting analysis for claim: '{claim_text}'")
 
@@ -142,4 +132,18 @@ def analyze_claim(claim_text: str) -> AnalysisResult:
         all_sources=all_sources,
         relevant_images=relevant_images,
         latency_seconds=elapsed,
+        mode="claim",
     )
+
+
+def analyze_claim(claim_text: str) -> AnalysisResult:
+    """Main verification entrypoint detecting input mode and dispatching accordingly."""
+    mode, url, text_or_question = detect_input_mode(claim_text)
+
+    if mode == "url_question" and url and text_or_question:
+        return analyze_url_with_question(url, text_or_question, analyze_claim_single)
+    elif mode == "url" and url:
+        return analyze_url_only(url, analyze_claim_single)
+    else:
+        return analyze_claim_single(claim_text)
+

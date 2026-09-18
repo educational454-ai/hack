@@ -68,6 +68,27 @@ class RelevantImage(BaseModel):
     relevance_score: Optional[float] = None
 
 
+class WebpageMetadata(BaseModel):
+    url: str
+    domain: str
+    title: Optional[str] = None
+    canonical_url: Optional[str] = None
+    publication_date: Optional[str] = None
+    author: Optional[str] = None
+
+
+class PerClaimResult(BaseModel):
+    claim: str
+    claim_type: ClaimType
+    verdict: AssessmentVerdict
+    verdict_symbol: str
+    verdict_title: str
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    explanation: str
+    supporting_evidence: List[EvidenceItem] = Field(default_factory=list)
+    contradicting_evidence: List[EvidenceItem] = Field(default_factory=list)
+
+
 class AnalysisResult(BaseModel):
     claim: str
     claim_type: ClaimType
@@ -82,3 +103,11 @@ class AnalysisResult(BaseModel):
     all_sources: List[SourceMetadata] = Field(default_factory=list)
     relevant_images: List[RelevantImage] = Field(default_factory=list)
     latency_seconds: Optional[float] = None
+
+    # Task 13 Mode Extensions
+    mode: Optional[str] = "claim"
+    webpage: Optional[WebpageMetadata] = None
+    user_question: Optional[str] = None
+    targeted_answer: Optional[str] = None
+    relevant_page_context: Optional[List[str]] = None
+    claims_analyzed: Optional[List[PerClaimResult]] = None

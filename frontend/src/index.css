@@ -1383,3 +1383,164 @@ body {
   content: "⚠️ ";
 }
 
+/* Task 13 — URL & URL+Question UI Components */
+.webpage-header-card {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.webpage-header-top {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.webpage-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #2563eb;
+  color: #ffffff;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.webpage-domain {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.webpage-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.webpage-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.user-question-box {
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+[data-theme="dark"] .user-question-box {
+  background: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.question-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2563eb;
+}
+
+[data-theme="dark"] .question-label {
+  color: #60a5fa;
+}
+
+.question-text {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.targeted-answer-card {
+  background: var(--bg-card);
+  border: 1.5px solid #2563eb;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+}
+
+[data-theme="dark"] .targeted-answer-card {
+  border-color: #3b82f6;
+}
+
+.targeted-answer-text {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.page-context-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+}
+
+.page-context-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.page-context-item {
+  background: var(--bg-card-subtle);
+  border-left: 3px solid #2563eb;
+  padding: 0.85rem 1rem;
+  border-radius: 0 0.65rem 0.65rem 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.claims-analyzed-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.claim-analyzed-card {
+  background: var(--bg-card-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.95rem;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.claim-analyzed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.claim-analyzed-text {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.claim-analyzed-expl {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+

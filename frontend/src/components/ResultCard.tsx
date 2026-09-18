@@ -43,12 +43,54 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
 
   return (
     <div className="result-container">
+      {/* Webpage Header for URL modes */}
+      {result.webpage && (
+        <div className="webpage-header-card">
+          <div className="webpage-header-top">
+            <span className="webpage-badge">Analyzed Webpage</span>
+            <span className="webpage-domain">{result.webpage.domain}</span>
+          </div>
+          {result.webpage.title && (
+            <h3 className="webpage-title">{result.webpage.title}</h3>
+          )}
+          <div className="webpage-meta-row">
+            {result.webpage.url && (
+              <a
+                href={result.webpage.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="details-toggle-btn"
+                aria-label="Open original webpage in new tab"
+              >
+                Visit Webpage <ExternalLink size={12} />
+              </a>
+            )}
+            {result.webpage.publication_date && (
+              <span className="webpage-date">Published: {result.webpage.publication_date}</span>
+            )}
+            {result.webpage.author && (
+              <span className="webpage-author">Author: {result.webpage.author}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* User Question Banner for URL+Question mode */}
+      {result.mode === "url_question" && result.user_question && (
+        <div className="user-question-box">
+          <span className="question-label">User Query:</span>
+          <p className="question-text">"{result.user_question}"</p>
+        </div>
+      )}
+
       {/* 1. Verdict Banner */}
       <div className={`verdict-banner ${result.verdict}`}>
         <div className="verdict-left">
           <span className="verdict-emoji">{result.verdict_symbol}</span>
           <div>
-            <span className="verdict-label">Assessment</span>
+            <span className="verdict-label">
+              {result.mode === "url" ? "Article Assessment" : "Assessment"}
+            </span>
             <h2 className="verdict-title">{result.verdict_title}</h2>
           </div>
         </div>
@@ -66,7 +108,18 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       </div>
 
-      {/* 2. Why? Evidence Synthesis */}
+      {/* 2. Targeted Answer for URL+Question mode */}
+      {result.mode === "url_question" && result.targeted_answer && (
+        <div className="card-section targeted-answer-card">
+          <h3 className="card-heading">
+            <HelpCircle size={19} className="heading-icon" />
+            Targeted Answer
+          </h3>
+          <p className="targeted-answer-text">{result.targeted_answer}</p>
+        </div>
+      )}
+
+      {/* 3. Why? Evidence Synthesis */}
       <div className="explanation-card">
         <h3 className="card-heading">
           <BookOpen size={19} className="heading-icon" />
@@ -75,15 +128,61 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         <p className="explanation-text">{result.explanation}</p>
       </div>
 
-      {/* 3. Visual Evidence Section (Conditional) */}
+      {/* 4. Relevant Page Context (URL+Question mode) */}
+      {result.relevant_page_context && result.relevant_page_context.length > 0 && (
+        <div className="card-section page-context-section">
+          <h3 className="card-heading">
+            <BookOpen size={19} className="heading-icon" />
+            Relevant Page Context (From Provided Webpage)
+          </h3>
+          <p className="visual-evidence-disclaimer">
+            Extracted directly from the provided URL — the webpage is the subject being analyzed, not independent proof.
+          </p>
+          <div className="page-context-list">
+            {result.relevant_page_context.map((ctx, idx) => (
+              <div key={idx} className="page-context-item">
+                "{ctx}"
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Claims Analyzed Grid (URL-Only mode) */}
+      {result.mode === "url" && result.claims_analyzed && result.claims_analyzed.length > 0 && (
+        <div className="card-section">
+          <h3 className="card-heading">
+            <CheckCircle2 size={19} className="heading-icon" />
+            Key Claims Analyzed ({result.claims_analyzed.length})
+          </h3>
+          <div className="claims-analyzed-grid">
+            {result.claims_analyzed.map((c, idx) => (
+              <div key={idx} className="claim-analyzed-card">
+                <div className="claim-analyzed-header">
+                  <span className={`stance-tag ${c.verdict}`}>
+                    {c.verdict_symbol} {c.verdict_title}
+                  </span>
+                  <span className="relevance-tag">
+                    Confidence: {Math.round(c.confidence_score * 100)}%
+                  </span>
+                </div>
+                <p className="claim-analyzed-text">"{c.claim}"</p>
+                <p className="claim-analyzed-expl">{c.explanation}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. Visual Evidence Section (Conditional) */}
       <VisualEvidenceSection images={images} />
 
-      {/* 4. Summary Evidence Cards */}
+      {/* 7. Independent Summary Evidence Cards */}
       {!isSubjective && summaryEvidence.length > 0 && (
         <div className="card-section">
           <h3 className="card-heading">
             <CheckCircle2 size={19} className="heading-icon" />
-            Evidence Summary ({summaryEvidence.length} items)
+            Independent Evidence Summary ({summaryEvidence.length} items)
           </h3>
           <div className="evidence-summary-grid">
             {summaryEvidence.map((ev, idx) => (
@@ -93,7 +192,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       )}
 
-      {/* 5. Evidence Limitations */}
+      {/* 8. Evidence Limitations */}
       {result.evidence_limitations && result.evidence_limitations.length > 0 && (
         <div className="card-section">
           <h3 className="card-heading">

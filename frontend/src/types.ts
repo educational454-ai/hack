@@ -39,6 +39,27 @@ export interface RelevantImage {
   relevance_score?: number | null;
 }
 
+export interface WebpageMetadata {
+  url: string;
+  domain: string;
+  title?: string | null;
+  canonical_url?: string | null;
+  publication_date?: string | null;
+  author?: string | null;
+}
+
+export interface PerClaimResult {
+  claim: string;
+  claim_type: ClaimType;
+  verdict: AssessmentVerdict;
+  verdict_symbol: string;
+  verdict_title: string;
+  confidence_score: number;
+  explanation: string;
+  supporting_evidence: EvidenceItem[];
+  contradicting_evidence: EvidenceItem[];
+}
+
 export interface AnalysisResult {
   claim: string;
   claim_type: ClaimType;
@@ -53,6 +74,12 @@ export interface AnalysisResult {
   all_sources: SourceMetadata[];
   relevant_images?: RelevantImage[];
   latency_seconds?: number | null;
+  mode?: "claim" | "url" | "url_question" | null;
+  webpage?: WebpageMetadata | null;
+  user_question?: string | null;
+  targeted_answer?: string | null;
+  relevant_page_context?: string[] | null;
+  claims_analyzed?: PerClaimResult[] | null;
 }
 
 export interface HealthStatus {
