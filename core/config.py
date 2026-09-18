@@ -20,7 +20,7 @@ class Config:
     @property
     def hf_llm_model(self) -> str:
         load_dotenv(BASE_DIR / ".env")
-        return os.getenv("HF_LLM_MODEL", "Qwen/Qwen2.5-72B-Instruct").strip()
+        return os.getenv("HF_LLM_MODEL", "meta-llama/Llama-3.3-70B-Instruct").strip()
 
     @property
     def hf_embedding_model(self) -> str:
