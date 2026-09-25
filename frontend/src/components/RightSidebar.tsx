@@ -6,6 +6,27 @@ interface RightSidebarProps {
   result: AnalysisResult | null;
 }
 
+function normalizeUrlString(url: string): string {
+  if (!url) return "";
+  let clean = url.trim();
+  clean = clean.replace(/#.*$/, "");
+  clean = clean.replace(/\/$/, "");
+  return clean.toLowerCase();
+}
+
+function deduplicateSourcesByUrl(sources: SourceMetadata[]): SourceMetadata[] {
+  const seen = new Set<string>();
+  const unique: SourceMetadata[] = [];
+  for (const src of sources) {
+    const key = src.url ? normalizeUrlString(src.url) : src.domain;
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      unique.push(src);
+    }
+  }
+  return unique;
+}
+
 export const RightSidebar: React.FC<RightSidebarProps> = ({ result }) => {
   if (!result) {
     return (
@@ -22,6 +43,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ result }) => {
       </aside>
     );
   }
+
+  const sourcesToDisplay = deduplicateSourcesByUrl(result.all_sources || []);
 
   // Combine supporting and contradicting evidence to look up similarity scores by URL or domain
   const allEvidence: EvidenceItem[] = [
@@ -75,14 +98,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ result }) => {
           <div className="header-title-group">
             <Globe size={18} className="sidebar-header-icon" />
             <h4 className="sidebar-card-title">
-              Relevant Resources ({result.all_sources?.length || 0})
+              Relevant Resources ({sourcesToDisplay.length})
             </h4>
           </div>
         </div>
 
-        {result.all_sources && result.all_sources.length > 0 ? (
+        {sourcesToDisplay.length > 0 ? (
           <div className="sidebar-sources-list">
-            {result.all_sources.map((src, idx) => {
+            {sourcesToDisplay.map((src, idx) => {
               const relevanceScore = getSourceRelevanceScore(src);
               return (
                 <SidebarResourceCard

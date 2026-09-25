@@ -937,6 +937,35 @@ body {
   color: var(--text-primary);
 }
 
+.card-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.source-diversity-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  letter-spacing: 0.01em;
+}
+
+.source-diversity-badge.multi-domain {
+  background: var(--tag-supports-bg);
+  color: var(--tag-supports-text);
+  border: 1px solid var(--tag-supports-border);
+}
+
+.source-diversity-badge.single-domain {
+  background: var(--bg-pill);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
 .explanation-text {
   color: var(--text-secondary);
   font-size: 0.96rem;

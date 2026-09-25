@@ -368,6 +368,15 @@ def analyze_url_only(
         article_symbol, article_title = "🟡", "INSUFFICIENT EVIDENCE"
         summary_explanation = f"Independent evidence was insufficient to establish conclusive support or contradiction for the {total} claims analyzed."
 
+    # Deduplicate aggregated sources by canonical page URL while preserving distinct pages
+    unique_sources: List[SourceMetadata] = []
+    seen_src_keys = set()
+    for src in all_sources:
+        key = normalize_url(src.url) if src.url else src.domain
+        if key and key not in seen_src_keys:
+            seen_src_keys.add(key)
+            unique_sources.append(src)
+
     elapsed = round(time.time() - start_time, 2)
 
     return AnalysisResult(
@@ -381,7 +390,7 @@ def analyze_url_only(
         supporting_evidence=all_supp[:4],
         contradicting_evidence=all_cont[:4],
         evidence_limitations=[f"Analyzed a bounded subset of {total} key claims extracted from the article."],
-        all_sources=all_sources[:6],
+        all_sources=unique_sources[:6],
         latency_seconds=elapsed,
         mode="url",
         webpage=webpage_meta,

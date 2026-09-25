@@ -18,6 +18,7 @@ from .extractor import extract_evidence_from_candidates
 from .ranker import rank_evidence_chunks, rank_and_filter_images
 from .evidence_gate import filter_evidence_for_verification
 from .verifier import verify_claim_evidence, VERDICT_SYMBOLS
+from .url_normalizer import normalize_url
 
 from .url_pipeline import detect_input_mode, analyze_url_with_question, analyze_url_only
 
@@ -65,9 +66,11 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     seen_urls = set()
     for item in candidates:
         u = item.get("url", "")
-        if u and u not in seen_urls:
-            seen_urls.add(u)
-            all_sources.append(build_source_metadata(u, item.get("title", "")))
+        if u:
+            norm_u = normalize_url(u)
+            if norm_u and norm_u not in seen_urls:
+                seen_urls.add(norm_u)
+                all_sources.append(build_source_metadata(u, item.get("title", "")))
 
     # Step 4: Passage Extraction & Boilerplate Cleaning
     extracted_chunks = extract_evidence_from_candidates(

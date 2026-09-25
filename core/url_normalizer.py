@@ -47,7 +47,7 @@ def normalize_url(url: str) -> str:
     try:
         parsed = urlparse(clean)
 
-        scheme = parsed.scheme.lower()
+        scheme = "https" if parsed.scheme.lower() in ("http", "https") else parsed.scheme.lower()
         netloc = parsed.netloc.lower().split(":")[0]  # Remove port
 
         # Normalize path: strip trailing slash unless root path

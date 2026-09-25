@@ -82,6 +82,49 @@ class TestSourceFilter(unittest.TestCase):
         tier3, _, _ = classify_source(None)
         self.assertEqual(tier3, SourceTier.LOW_CONFIDENCE)
 
+    def test_canonical_url_normalization_deduplication(self):
+        from core.url_normalizer import normalize_url
+        from core.source_filter import build_source_metadata
+
+        raw_urls = [
+            "https://en.wikipedia.org/wiki/India",
+            "https://en.wikipedia.org/wiki/India#Geography",
+            "http://en.wikipedia.org/wiki/India/",
+            "https://en.wikipedia.org/wiki/India?utm_source=test",
+        ]
+
+        seen_urls = set()
+        deduped = []
+        for u in raw_urls:
+            norm_u = normalize_url(u)
+            if norm_u not in seen_urls:
+                seen_urls.add(norm_u)
+                deduped.append(build_source_metadata(u, "India - Wikipedia"))
+
+        self.assertEqual(len(deduped), 1)
+        self.assertEqual(deduped[0].domain, "en.wikipedia.org")
+
+    def test_same_domain_distinct_pages_preserved(self):
+        from core.url_normalizer import normalize_url
+        from core.source_filter import build_source_metadata
+
+        distinct_urls = [
+            "https://en.wikipedia.org/wiki/India",
+            "https://en.wikipedia.org/wiki/States_and_union_territories_of_India",
+        ]
+
+        seen_urls = set()
+        deduped = []
+        for u in distinct_urls:
+            norm_u = normalize_url(u)
+            if norm_u not in seen_urls:
+                seen_urls.add(norm_u)
+                deduped.append(build_source_metadata(u, "Wikipedia Page"))
+
+        self.assertEqual(len(deduped), 2)
+        self.assertEqual(deduped[0].domain, "en.wikipedia.org")
+        self.assertEqual(deduped[1].domain, "en.wikipedia.org")
+
 
 if __name__ == "__main__":
     unittest.main()

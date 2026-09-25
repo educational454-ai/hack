@@ -41,6 +41,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
 
   const images = result.relevant_images || [];
 
+  const uniqueDomains = Array.from(
+    new Set(summaryEvidence.map((ev) => ev.domain).filter(Boolean))
+  );
+  const hasMultipleDomains = uniqueDomains.length > 1;
+  const isSinglePublisher = summaryEvidence.length > 1 && uniqueDomains.length === 1;
+
   return (
     <div className="result-container">
       {/* Webpage Header for URL modes */}
@@ -177,13 +183,30 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
       {/* 6. Visual Evidence Section (Conditional) */}
       <VisualEvidenceSection images={images} />
 
-      {/* 7. Independent Summary Evidence Cards */}
+      {/* 7. Summary Evidence Cards */}
       {!isSubjective && summaryEvidence.length > 0 && (
         <div className="card-section">
-          <h3 className="card-heading">
-            <CheckCircle2 size={19} className="heading-icon" />
-            Independent Evidence Summary ({summaryEvidence.length} items)
-          </h3>
+          <div className="card-section-header">
+            <h3 className="card-heading" style={{ marginBottom: 0 }}>
+              <CheckCircle2 size={19} className="heading-icon" />
+              Retrieved Evidence Summary ({summaryEvidence.length} {summaryEvidence.length === 1 ? "item" : "items"})
+            </h3>
+            {hasMultipleDomains ? (
+              <span
+                className="source-diversity-badge multi-domain"
+                title="Evidence spans multiple independent publisher domains"
+              >
+                {uniqueDomains.length} Independent Source Domains
+              </span>
+            ) : isSinglePublisher ? (
+              <span
+                className="source-diversity-badge single-domain"
+                title="Multiple evidence passages extracted from a single source domain"
+              >
+                Single Source Domain ({uniqueDomains[0]})
+              </span>
+            ) : null}
+          </div>
           <div className="evidence-summary-grid">
             {summaryEvidence.map((ev, idx) => (
               <SummaryEvidenceCard key={idx} item={ev} />
