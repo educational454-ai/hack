@@ -36,5 +36,14 @@ class TestClaimParser(unittest.TestCase):
         self.assertTrue(parsed.is_verifiable)
 
 
+    def test_subjective_claim_neutral_explanation(self):
+        parsed = parse_claim("Mumbai is the best city in India.")
+        self.assertEqual(parsed.claim_type, ClaimType.SUBJECTIVE_OPINION)
+        self.assertFalse(parsed.is_verifiable)
+        explanation = " ".join(parsed.perspectives or [])
+        self.assertNotIn("political", explanation.lower())
+        self.assertIn("qualitative", explanation.lower())
+
+
 if __name__ == "__main__":
     unittest.main()

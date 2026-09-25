@@ -108,9 +108,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
           >
             Verification Confidence: {Math.round(result.confidence_score * 100)}%
           </span>
-          {result.latency_seconds && (
+          {typeof result.latency_seconds === "number" && result.latency_seconds > 0 ? (
             <span className="meta-pill">{result.latency_seconds}s</span>
-          )}
+          ) : null}
         </div>
       </div>
 

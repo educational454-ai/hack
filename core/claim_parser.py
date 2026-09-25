@@ -65,8 +65,8 @@ def classify_claim_heuristics(text: str) -> Tuple[ClaimType, str, List[str]]:
         cleaned_markers = ", ".join(dict.fromkeys(matched_subjective[:3]))
         perspectives = [
             f"The statement employs subjective or interpretive framing ('{cleaned_markers}').",
-            "This expresses a qualitative characterization, value judgment, or narrative trope rather than an objectively verifiable empirical fact.",
-            "Different observers and analysts hold contrasting viewpoints based on their values, political stances, or interpretive frameworks.",
+            "This expresses a qualitative characterization, value judgment, or preference rather than an objectively verifiable empirical fact.",
+            "Different observers hold contrasting conclusions based on their personal criteria, values, or interpretive frameworks.",
         ]
         return (
             ClaimType.SUBJECTIVE_OPINION,
