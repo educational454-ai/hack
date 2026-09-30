@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { Header } from "./components/Header";
 import { ClaimInput } from "./components/ClaimInput";
 import { PipelineSteps } from "./components/PipelineSteps";
@@ -169,6 +170,7 @@ export const App: React.FC = () => {
 
         <RightSidebar result={result} />
       </div>
+      <Analytics />
     </div>
   );
 };
