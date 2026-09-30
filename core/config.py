@@ -49,7 +49,12 @@ class Config:
 
     @property
     def has_hf_token(self) -> bool:
-        return bool(self.hf_token and len(self.hf_token) > 5)
+        t = self.hf_token
+        if not t or len(t) < 8:
+            return False
+        if t.startswith("your_") or "placeholder" in t.lower() or "your_token" in t.lower():
+            return False
+        return True
 
 
 config = Config()

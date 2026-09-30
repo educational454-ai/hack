@@ -45,11 +45,22 @@ def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:
     return dot_product / (norm_a * norm_b)
 
 
+def _stem(word: str) -> str:
+    w = word.lower()
+    for suffix in ("ing", "ed", "es", "s", "ment", "ments", "tion", "tions"):
+        if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+            w = w[:-len(suffix)].rstrip("e")
+            if len(w) >= 3 and w[-1] == w[-2] and w[-1] not in "ls":
+                w = w[:-1]
+            return w
+    return w
+
+
 def compute_lexical_similarity(claim: str, passage: str) -> float:
     """Fast fallback lexical overlap & term frequency similarity."""
-    claim_words = set(re_tokenize(claim))
-    passage_words = re_tokenize(passage)
-    if not claim_words or not passage_words:
+    claim_tokens = re_tokenize(claim)
+    passage_tokens = re_tokenize(passage)
+    if not claim_tokens or not passage_tokens:
         return 0.0
 
     def word_match(pw: str, cw: str) -> bool:
@@ -62,9 +73,16 @@ def compute_lexical_similarity(claim: str, passage: str) -> float:
                 return True
         return False
 
-    hit_count = sum(1 for pw in passage_words if any(word_match(pw, cw) for cw in claim_words))
+    claim_words = set(claim_tokens)
+    claim_stems = {_stem(w) for w in claim_tokens}
+
+    hit_count = sum(
+        1
+        for w in passage_tokens
+        if w in claim_words or _stem(w) in claim_stems or any(word_match(w, cw) for cw in claim_words)
+    )
     # Jaccard / frequency score normalized
-    overlap = hit_count / (len(claim_words) + math.log1p(len(passage_words)))
+    overlap = hit_count / (len(claim_words) + math.log1p(len(passage_tokens)))
     return min(max(overlap, 0.0), 1.0)
 
 
@@ -220,9 +238,11 @@ def score_image_relevance(claim: str, image_dict: Dict[str, Any]) -> float:
         sim_score = compute_lexical_similarity(claim, meta_text)
 
     claim_terms = re_tokenize(claim)
+    claim_stems = {_stem(t) for t in claim_terms}
     meta_terms = set(re_tokenize(meta_text))
+    meta_stems = {_stem(t) for t in meta_terms}
     if claim_terms:
-        matches = sum(1 for t in claim_terms if t in meta_terms)
+        matches = sum(1 for t in claim_terms if t in meta_terms or _stem(t) in meta_stems)
         ratio = matches / len(claim_terms)
     else:
         ratio = 1.0

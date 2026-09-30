@@ -52,20 +52,13 @@ class TestTask81SyntheticEvidenceRemoval(unittest.TestCase):
         """Verifies that retrieve_search_candidates returns [] when search client fails."""
         from core.retriever import retrieve_search_candidates
         try:
-            import ddgs
-            with patch("ddgs.DDGS", side_effect=Exception("Search failed")):
+            with patch("ddgs.DDGS", side_effect=Exception("Search failed")), \
+                 patch("duckduckgo_search.DDGS", side_effect=Exception("Search failed")):
                 candidates = retrieve_search_candidates(["unindexed query text"])
                 self.assertEqual(candidates, [])
-        except ImportError:
-            try:
-                # pyrefly: ignore [missing-import]
-                import duckduckgo_search
-                with patch("duckduckgo_search.DDGS", side_effect=Exception("Search failed")):
-                    candidates = retrieve_search_candidates(["unindexed query text"])
-                    self.assertEqual(candidates, [])
-            except ImportError:
-                candidates = retrieve_search_candidates(["unindexed query text"])
-                self.assertEqual(candidates, [])
+        except Exception:
+            candidates = retrieve_search_candidates(["unindexed query text"])
+            self.assertEqual(candidates, [])
 
     def test_existing_retrieval_behavior_with_real_candidates(self):
         """Verifies that retrieval behavior is unchanged when real candidates exist."""

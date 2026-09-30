@@ -110,36 +110,36 @@ def classify_source(url: str, title: str = "") -> Tuple[SourceTier, str, float]:
             0.4,
         )
 
-    # 1. Check Primary indicators
+    # 1. Check Primary indicators (Official Source)
     if is_in_domain_set(domain, PRIMARY_DOMAINS) or any(
         domain == tld[1:] or domain.endswith(tld) for tld in PRIMARY_TLDS
     ):
         return (
             SourceTier.PRIMARY,
-            "Primary source: Official government authority, academic publication, or recognized legal repository.",
+            "Official Source: Official government authority, academic publication, or recognized legal repository.",
             1.0,
         )
 
-    # 2. Check Low-Confidence indicators (explicitly listed social platforms / forums / user blogs)
+    # 2. Check Low-Confidence indicators (Blogs & Articles: social platforms / forums / user blogs)
     if is_in_domain_set(domain, LOW_CONFIDENCE_DOMAINS):
         return (
             SourceTier.LOW_CONFIDENCE,
-            "Low-confidence source: User-generated content platform, forum, or unvetted blog.",
+            "Blogs & Articles: User-generated content platform, forum, or unvetted blog.",
             0.4,
         )
 
-    # 3. Check Secondary indicators (explicitly listed recognized secondary domains)
+    # 3. Check Secondary indicators (News Article: established journalistic outlets / wire services)
     if is_in_domain_set(domain, SECONDARY_DOMAINS):
         return (
             SourceTier.SECONDARY,
-            "Secondary source: Established journalistic outlet, news agency, or recognized fact-checking organization.",
+            "News Article: Established journalistic outlet, news agency, or recognized fact-checking organization.",
             0.85,
         )
 
-    # 4. Fallback for unclassified / unknown domains: treat conservatively as LOW_CONFIDENCE
+    # 4. Fallback for unclassified / unknown domains: treat conservatively as Blogs & Articles
     return (
         SourceTier.LOW_CONFIDENCE,
-        "Low-confidence source: Unknown or unclassified web publication.",
+        "Blogs & Articles: Unknown or unclassified web publication.",
         0.4,
     )
 

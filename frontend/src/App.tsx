@@ -5,25 +5,32 @@ import { PipelineSteps } from "./components/PipelineSteps";
 import { ResultCard } from "./components/ResultCard";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
-import { analyzeClaimAPI } from "./api";
+import { analyzeClaimAPI, analyzeImageAPI } from "./api";
 import { AnalysisResult } from "./types";
 import { AlertCircle } from "lucide-react";
 
 export const App: React.FC = () => {
   const [claim, setClaim] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAnalyze = async (claimToAnalyze: string) => {
-    if (!claimToAnalyze.trim()) return;
+  const handleAnalyze = async (claimToAnalyze: string, imageFile?: File | null) => {
+    const fileToUse = imageFile !== undefined ? imageFile : selectedImage;
+    if (!claimToAnalyze.trim() && !fileToUse) return;
 
     setIsLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const data = await analyzeClaimAPI(claimToAnalyze);
+      let data: AnalysisResult;
+      if (fileToUse) {
+        data = await analyzeImageAPI(fileToUse, claimToAnalyze);
+      } else {
+        data = await analyzeClaimAPI(claimToAnalyze);
+      }
       setResult(data);
     } catch (err: any) {
       setError(
@@ -46,6 +53,8 @@ export const App: React.FC = () => {
           <ClaimInput
             claim={claim}
             setClaim={setClaim}
+            selectedImage={selectedImage}
+            setSelectedImage={setSelectedImage}
             onAnalyze={handleAnalyze}
             isLoading={isLoading}
           />

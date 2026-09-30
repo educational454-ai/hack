@@ -34,10 +34,25 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
   const isSubjective = result.claim_type === "subjective_opinion";
 
   // Combine top evidence: 3 cards per row, maximum 2 rows = max 6 cards
-  const summaryEvidence: EvidenceItem[] = [
+  let summaryEvidence: EvidenceItem[] = [
     ...result.contradicting_evidence,
     ...result.supporting_evidence,
-  ].slice(0, 6);
+  ];
+
+  // If no direct supporting/contradicting items, include retrieved sources so user always has related articles
+  if (summaryEvidence.length === 0 && result.all_sources && result.all_sources.length > 0) {
+    summaryEvidence = result.all_sources.slice(0, 6).map((src, idx) => ({
+      id: `ref_${idx + 1}`,
+      url: src.url,
+      title: src.title || src.domain,
+      domain: src.domain,
+      source_tier: src.tier,
+      passage: src.tier_reason || `Related article reporting on this topic from ${src.domain}.`,
+      similarity_score: 0.65,
+      stance: "neutral",
+    }));
+  }
+  summaryEvidence = summaryEvidence.slice(0, 6);
 
   const images = result.relevant_images || [];
 
@@ -89,13 +104,46 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       )}
 
+      {/* Uploaded Image & OCR Extraction Banner */}
+      {result.mode === "image" && (result.image_preview || result.extracted_image_text) && (
+        <div className="image-result-section">
+          {result.image_preview && (
+            <div className="image-result-thumb-wrapper">
+              <img
+                src={result.image_preview}
+                alt="Analyzed screenshot"
+                className="image-result-thumb"
+              />
+            </div>
+          )}
+          <div className="image-result-details">
+            {result.extracted_image_text && (
+              <div className="ocr-extracted-box">
+                <span className="ocr-badge">OCR Detected Claim</span>
+                <p className="ocr-text">"{result.extracted_image_text}"</p>
+              </div>
+            )}
+            {result.user_question && (
+              <div className="user-question-box" style={{ padding: "0.6rem 0.85rem" }}>
+                <span className="question-label">User Query:</span>
+                <p className="question-text" style={{ fontSize: "0.92rem" }}>"{result.user_question}"</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 1. Verdict Banner */}
       <div className={`verdict-banner ${result.verdict}`}>
         <div className="verdict-left">
           <span className="verdict-emoji">{result.verdict_symbol}</span>
           <div>
             <span className="verdict-label">
-              {result.mode === "url" ? "Article Assessment" : "Assessment"}
+              {result.mode === "url"
+                ? "Article Assessment"
+                : result.mode === "image"
+                ? "Image Claim Assessment"
+                : "Assessment"}
             </span>
             <h2 className="verdict-title">{result.verdict_title}</h2>
           </div>
@@ -114,12 +162,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       </div>
 
-      {/* 2. Targeted Answer for URL+Question mode */}
-      {result.mode === "url_question" && result.targeted_answer && (
+      {/* 2. Answer Statement */}
+      {result.targeted_answer && (
         <div className="card-section targeted-answer-card">
           <h3 className="card-heading">
-            <HelpCircle size={19} className="heading-icon" />
-            Targeted Answer
+            <CheckCircle2 size={19} className="heading-icon" />
+            Answer
           </h3>
           <p className="targeted-answer-text">{result.targeted_answer}</p>
         </div>
@@ -325,9 +373,9 @@ const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
   const isSupporting = stance === "supports";
 
   const tierLabelMap: Record<string, string> = {
-    primary: "Primary Source",
-    secondary: "Secondary Source",
-    low_confidence: "Lower Confidence Source",
+    primary: "Official Source",
+    secondary: "News Article",
+    low_confidence: "Blogs & Articles",
   };
   const tierDisplay = tierLabelMap[item.source_tier] || item.source_tier;
 

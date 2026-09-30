@@ -99,6 +99,11 @@ def detect_input_mode(input_text: str) -> Tuple[str, Optional[str], Optional[str
     # Clean up whitespace/newlines
     remaining_text = re.sub(r"\n+", " ", remaining_text).strip()
 
+    IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif')
+    url_path_lower = raw_url.lower().split("?")[0]
+    if any(url_path_lower.endswith(ext) for ext in IMAGE_EXTENSIONS):
+        return "image_url", raw_url, remaining_text or None
+
     if remaining_text and len(remaining_text) >= 3:
         return "url_question", raw_url, remaining_text
     else:

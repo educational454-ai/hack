@@ -17,7 +17,7 @@ from .source_filter import build_source_metadata
 from .extractor import extract_evidence_from_candidates
 from .ranker import rank_evidence_chunks, rank_and_filter_images
 from .evidence_gate import filter_evidence_for_verification
-from .verifier import verify_claim_evidence, VERDICT_SYMBOLS
+from .verifier import verify_claim_evidence, VERDICT_SYMBOLS, formulate_direct_statement
 from .url_normalizer import normalize_url
 
 from .url_pipeline import detect_input_mode, analyze_url_with_question, analyze_url_only
@@ -39,6 +39,7 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
         verdict, conf, expl, supp, cont, limits = verify_claim_evidence(parsed, [])
         sym, title = VERDICT_SYMBOLS[verdict]
         elapsed = round(time.time() - start_time, 2)
+        direct_answer = formulate_direct_statement(parsed.original_text, verdict)
         return AnalysisResult(
             claim=parsed.original_text,
             claim_type=parsed.claim_type,
@@ -52,6 +53,8 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
             evidence_limitations=limits,
             all_sources=[],
             latency_seconds=elapsed,
+            mode="claim",
+            targeted_answer=direct_answer,
         )
 
     # Step 2: Web Search Retrieval
@@ -113,6 +116,10 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     except Exception as img_ex:
         logger.warning(f"Could not retrieve/instantiate images: {img_ex}")
 
+    direct_answer = formulate_direct_statement(parsed.original_text, verdict)
+    if not expl.startswith("No,") and not expl.startswith("Yes,") and not expl.startswith("The statement"):
+        expl = f"{direct_answer} {expl}"
+
     elapsed = round(time.time() - start_time, 2)
     logger.info(f"Completed analysis in {elapsed}s with verdict: {title} ({sym})")
 
@@ -136,12 +143,27 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
         relevant_images=relevant_images,
         latency_seconds=elapsed,
         mode="claim",
+        targeted_answer=direct_answer,
     )
 
 
 def analyze_claim(claim_text: str) -> AnalysisResult:
     """Main verification entrypoint detecting input mode and dispatching accordingly."""
     mode, url, text_or_question = detect_input_mode(claim_text)
+
+    if mode == "image_url" and url:
+        try:
+            import requests
+            resp = requests.get(url, timeout=8.0, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code == 200:
+                from .image_pipeline import analyze_image
+                return analyze_image(
+                    image_bytes=resp.content,
+                    filename=url.split("/")[-1].split("?")[0],
+                    user_question=text_or_question,
+                )
+        except Exception as exc:
+            logger.warning(f"Failed to fetch image from URL '{url}': {exc}")
 
     if mode == "url_question" and url and text_or_question:
         return analyze_url_with_question(url, text_or_question, analyze_claim_single)

@@ -74,12 +74,14 @@ export interface AnalysisResult {
   all_sources: SourceMetadata[];
   relevant_images?: RelevantImage[];
   latency_seconds?: number | null;
-  mode?: "claim" | "url" | "url_question" | null;
+  mode?: "claim" | "url" | "url_question" | "image" | null;
   webpage?: WebpageMetadata | null;
   user_question?: string | null;
   targeted_answer?: string | null;
   relevant_page_context?: string[] | null;
   claims_analyzed?: PerClaimResult[] | null;
+  extracted_image_text?: string | null;
+  image_preview?: string | null;
 }
 
 export interface HealthStatus {

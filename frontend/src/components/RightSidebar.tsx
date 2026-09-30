@@ -153,9 +153,9 @@ const SidebarResourceCard: React.FC<SidebarResourceCardProps> = ({
   relevanceScore,
 }) => {
   const tierLabelMap: Record<string, string> = {
-    primary: "PRIMARY SOURCE",
-    secondary: "SECONDARY SOURCE",
-    low_confidence: "LOW CONFIDENCE SOURCE",
+    primary: "OFFICIAL SOURCE",
+    secondary: "NEWS ARTICLE",
+    low_confidence: "BLOGS & ARTICLES",
   };
   const tierDisplay = tierLabelMap[source.tier] || source.tier.toUpperCase();
 

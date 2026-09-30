@@ -41,3 +41,30 @@ export async function analyzeClaimAPI(claim: string): Promise<AnalysisResult> {
 
   return await res.json();
 }
+
+export async function analyzeImageAPI(file: File, question?: string): Promise<AnalysisResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (question && question.trim()) {
+    formData.append("question", question.trim());
+  }
+
+  const res = await fetch(`${API_BASE}/api/analyze-image`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorDetail = "Image verification analysis failed";
+    try {
+      const errJson = await res.json();
+      if (errJson.detail) errorDetail = errJson.detail;
+    } catch {
+      // fallback to generic message
+    }
+    throw new Error(errorDetail);
+  }
+
+  return await res.json();
+}
+

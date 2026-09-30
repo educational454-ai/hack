@@ -1,15 +1,18 @@
 """FastAPI backend application for Evidence-First Misinformation Analyzer (AI-03)."""
 
-from fastapi import FastAPI, HTTPException
+import base64
+import logging
+import os
+from typing import Dict, Any, Optional
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Dict, Any
 
 from core.config import config
 from core.pipeline import analyze_claim
+from core.image_pipeline import analyze_image
 from core.schemas import AnalysisResult
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +21,6 @@ app = FastAPI(
     description="Multi-stage evidence-grounded verification API powered by Hugging Face models and BGE-M3.",
     version="1.0.0",
 )
-
-import os
 
 # Configure CORS origins for production Vercel frontend and local development
 cors_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
@@ -43,7 +44,10 @@ app.add_middleware(
 
 
 class AnalyzeRequest(BaseModel):
-    claim: str = Field(..., min_length=3, description="The textual statement or claim to verify.")
+    claim: Optional[str] = Field(None, min_length=3, description="The textual statement, URL, or claim to verify.")
+    image_base64: Optional[str] = Field(None, description="Base64-encoded image string or data URI.")
+    image_filename: Optional[str] = Field(None, description="Filename for the uploaded image.")
+    question: Optional[str] = Field(None, description="Optional question about the image or claim.")
 
 
 class HealthResponse(BaseModel):
@@ -73,9 +77,25 @@ def health_check():
 
 @app.post("/api/analyze", response_model=AnalysisResult)
 def analyze(req: AnalyzeRequest):
-    claim_text = req.claim.strip()
+    if req.image_base64:
+        try:
+            raw_b64 = req.image_base64.strip()
+            if "," in raw_b64:
+                raw_b64 = raw_b64.split(",", 1)[1]
+            image_bytes = base64.b64decode(raw_b64)
+            result = analyze_image(
+                image_bytes=image_bytes,
+                filename=req.image_filename or "uploaded_image.png",
+                user_question=req.question or req.claim,
+            )
+            return result
+        except Exception as exc:
+            logger.error(f"Image analysis error: {exc}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to process image payload.")
+
+    claim_text = (req.claim or "").strip()
     if not claim_text:
-        raise HTTPException(status_code=400, detail="Claim text cannot be empty.")
+        raise HTTPException(status_code=400, detail="Claim text or image payload cannot be empty.")
 
     try:
         result = analyze_claim(claim_text)
@@ -83,3 +103,25 @@ def analyze(req: AnalyzeRequest):
     except Exception as exc:
         logger.error(f"Pipeline execution error: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred while processing the verification pipeline.")
+
+
+@app.post("/api/analyze-image", response_model=AnalysisResult)
+async def analyze_image_endpoint(
+    file: UploadFile = File(...),
+    question: Optional[str] = Form(None),
+):
+    try:
+        image_bytes = await file.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+        result = analyze_image(
+            image_bytes=image_bytes,
+            filename=file.filename or "uploaded_image.png",
+            user_question=question,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Image upload analysis error: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to analyze uploaded image.")
