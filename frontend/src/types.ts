@@ -90,3 +90,11 @@ export interface HealthStatus {
   llm_model: string;
   embedding_model: string;
 }
+
+export interface HistoryItem {
+  id: string;
+  claim: string;
+  timestamp: number;
+  result: AnalysisResult;
+}
+

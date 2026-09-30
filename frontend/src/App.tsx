@@ -6,8 +6,10 @@ import { ResultCard } from "./components/ResultCard";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightSidebar } from "./components/RightSidebar";
 import { analyzeClaimAPI, analyzeImageAPI } from "./api";
-import { AnalysisResult } from "./types";
+import { AnalysisResult, HistoryItem } from "./types";
 import { AlertCircle } from "lucide-react";
+
+const HISTORY_STORAGE_KEY = "misinfo_chat_history";
 
 export const App: React.FC = () => {
   const [claim, setClaim] = useState("");
@@ -15,6 +17,23 @@ export const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize last 5 chats from localStorage
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.slice(0, 5);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to read chat history from localStorage", e);
+    }
+    return [];
+  });
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null);
 
   const handleAnalyze = async (claimToAnalyze: string, imageFile?: File | null) => {
     const fileToUse = imageFile !== undefined ? imageFile : selectedImage;
@@ -32,6 +51,36 @@ export const App: React.FC = () => {
         data = await analyzeClaimAPI(claimToAnalyze);
       }
       setResult(data);
+
+      // Save to chat history (up to last 5 chats)
+      const claimTitle =
+        claimToAnalyze.trim() ||
+        (data.extracted_image_text
+          ? `Image: ${data.extracted_image_text.slice(0, 60)}`
+          : fileToUse
+          ? `Image: ${fileToUse.name}`
+          : "Untitled Inquiry");
+
+      const newItem: HistoryItem = {
+        id: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        claim: claimTitle,
+        timestamp: Date.now(),
+        result: data,
+      };
+
+      setHistory((prev) => {
+        const filtered = prev.filter(
+          (item) => item.claim.toLowerCase() !== claimTitle.toLowerCase()
+        );
+        const updated = [newItem, ...filtered].slice(0, 5);
+        try {
+          localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
+        } catch (storageErr) {
+          console.error("Failed to save history", storageErr);
+        }
+        return updated;
+      });
+      setActiveHistoryId(newItem.id);
     } catch (err: any) {
       setError(
         err.message ||
@@ -42,12 +91,59 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSelectHistory = (item: HistoryItem) => {
+    setActiveHistoryId(item.id);
+    setClaim(item.claim);
+    setSelectedImage(null);
+    setResult(item.result);
+    setError(null);
+  };
+
+  const handleNewChat = () => {
+    setActiveHistoryId(null);
+    setClaim("");
+    setSelectedImage(null);
+    setResult(null);
+    setError(null);
+    const textarea = document.querySelector(".claim-textarea") as HTMLTextAreaElement;
+    textarea?.focus();
+  };
+
+  const handleDeleteHistory = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setHistory((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      try {
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    if (activeHistoryId === id) {
+      setActiveHistoryId(null);
+    }
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem(HISTORY_STORAGE_KEY);
+    } catch {}
+    setActiveHistoryId(null);
+  };
+
   return (
     <div className="app-container">
       <Header />
 
       <div className="app-layout">
-        <LeftSidebar />
+        <LeftSidebar
+          history={history}
+          activeHistoryId={activeHistoryId}
+          onSelectHistory={handleSelectHistory}
+          onNewChat={handleNewChat}
+          onDeleteHistory={handleDeleteHistory}
+          onClearHistory={handleClearHistory}
+        />
 
         <main className="main-content">
           <ClaimInput
