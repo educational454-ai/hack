@@ -1,25 +1,38 @@
 """Image OCR and Text Extraction Engine for Multimodal Misinformation Analysis.
 
 Supports:
-1. Native Windows WinRT OCR (Windows.Media.Ocr) - offline, fast, zero external dependencies.
-2. Pytesseract OCR - cross-platform fallback when Tesseract binary is available.
+1. Primary: RapidOCR (rapidocr-onnxruntime) - cross-platform, fast, pure Python wheel + ONNX runtime.
+2. Fallback: Pytesseract OCR - when tesseract binary executable is installed on system.
 3. Fallback text extraction & normalization.
 """
 
-import asyncio
 import io
 import logging
 import os
 import re
-import tempfile
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Tuple
 from PIL import Image, ImageOps
 
+from .config import config
+
 logger = logging.getLogger(__name__)
 
-# Dedicated thread pool for OCR operations so WinRT async tasks never conflict with FastAPI event loop
-_ocr_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ocr_worker")
+# Lazy singleton for RapidOCR engine
+_rapid_ocr_engine = None
+
+
+def get_rapid_ocr_engine():
+    """Lazily initializes and caches the RapidOCR engine instance."""
+    global _rapid_ocr_engine
+    if _rapid_ocr_engine is None:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _rapid_ocr_engine = RapidOCR()
+            logger.info("Successfully initialized RapidOCR engine.")
+        except Exception as exc:
+            logger.warning(f"Failed to initialize RapidOCR engine: {exc}")
+            _rapid_ocr_engine = False
+    return _rapid_ocr_engine if _rapid_ocr_engine is not False else None
 
 
 def preprocess_image_for_ocr(image: Image.Image) -> Image.Image:
@@ -46,53 +59,36 @@ def preprocess_image_for_ocr(image: Image.Image) -> Image.Image:
     return image
 
 
-def _run_winrt_ocr_sync(image_path: str) -> Optional[str]:
-    """Runs Windows.Media.Ocr synchronously in an isolated thread with its own event loop."""
+def _run_rapid_ocr(image_bytes: bytes) -> Tuple[Optional[str], Optional[str]]:
+    """Runs RapidOCR on raw image bytes."""
+    engine = get_rapid_ocr_engine()
+    if engine is None:
+        return None, "RapidOCR engine not available."
+
     try:
-        import winrt.windows.storage as ws
-        import winrt.windows.graphics.imaging as wgi
-        import winrt.windows.media.ocr as wmo
-
-        async def _async_ocr():
-            abs_path = os.path.abspath(image_path)
-            storage_file = await ws.StorageFile.get_file_from_path_async(abs_path)
-            stream = await storage_file.open_async(ws.FileAccessMode.READ)
-            decoder = await wgi.BitmapDecoder.create_async(stream)
-            software_bitmap = await decoder.get_software_bitmap_async()
-
-            engine = wmo.OcrEngine.try_create_from_user_profile_languages()
-            if engine is None:
-                import winrt.windows.globalization as wg
-                engine = wmo.OcrEngine.try_create_from_language(wg.Language("en-US"))
-
-            if engine is None:
-                return None
-
-            ocr_res = await engine.recognize_async(software_bitmap)
-            return ocr_res.text
-
-        loop = asyncio.new_event_loop()
-        try:
-            asyncio.set_event_loop(loop)
-            extracted = loop.run_until_complete(_async_ocr())
-            return extracted
-        finally:
-            loop.close()
+        ocr_res, _ = engine(image_bytes)
+        if ocr_res:
+            lines = [line[1] for line in ocr_res if len(line) >= 2 and line[1]]
+            text = " ".join(lines).strip()
+            if text:
+                return text, None
+        return "", None
     except Exception as exc:
-        logger.warning(f"WinRT OCR encountered error: {exc}")
-        return None
+        logger.warning(f"RapidOCR execution encountered error: {exc}")
+        return None, f"RapidOCR execution error: {exc}"
 
 
-def _run_pytesseract_ocr(pil_img: Image.Image) -> Optional[str]:
-    """Runs pytesseract OCR if tesseract executable is installed and available."""
+def _run_pytesseract_ocr(pil_img: Image.Image) -> Tuple[Optional[str], Optional[str]]:
+    """Runs pytesseract OCR if tesseract executable is installed on system."""
     try:
         import pytesseract
         text = pytesseract.image_to_string(pil_img)
         if text and text.strip():
-            return text.strip()
+            return text.strip(), None
+        return "", None
     except Exception as exc:
-        logger.debug(f"Pytesseract not available or failed: {exc}")
-    return None
+        logger.debug(f"Pytesseract execution failed: {exc}")
+        return None, f"Pytesseract error: {exc}"
 
 
 def clean_extracted_ocr_text(raw_text: str) -> str:
@@ -128,7 +124,7 @@ def extract_text_from_image_bytes(image_bytes: bytes) -> Tuple[str, Optional[str
     """Extracts text from raw image bytes using available OCR engines.
 
     Returns:
-        (extracted_text, error_message_if_any)
+        (extracted_text, error_message_or_status)
     """
     if not image_bytes:
         return "", "Empty image payload provided."
@@ -140,30 +136,27 @@ def extract_text_from_image_bytes(image_bytes: bytes) -> Tuple[str, Optional[str
 
     processed_img = preprocess_image_for_ocr(pil_image)
 
-    # 1. Primary: Try Windows WinRT OCR via temporary file
-    extracted_text = None
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
-        tmp_path = tmp_file.name
+    # Convert processed PIL image back to bytes for engines accepting raw bytes
+    buf = io.BytesIO()
+    processed_img.save(buf, format="PNG")
+    processed_bytes = buf.getvalue()
 
-    try:
-        processed_img.save(tmp_path, format="PNG")
-        future = _ocr_executor.submit(_run_winrt_ocr_sync, tmp_path)
-        extracted_text = future.result(timeout=15)
-    except Exception as exc:
-        logger.warning(f"Primary WinRT OCR execution failed: {exc}")
-    finally:
-        if os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except Exception:
-                pass
+    # 1. Primary: RapidOCR (rapidocr-onnxruntime)
+    text, err = _run_rapid_ocr(processed_bytes)
+    if text:
+        clean_text = clean_extracted_ocr_text(text)
+        if clean_text:
+            return clean_text, None
 
-    # 2. Fallback: Try pytesseract
-    if not extracted_text or not extracted_text.strip():
-        extracted_text = _run_pytesseract_ocr(processed_img)
+    # 2. Fallback: Pytesseract
+    text_tess, err_tess = _run_pytesseract_ocr(processed_img)
+    if text_tess:
+        clean_text = clean_extracted_ocr_text(text_tess)
+        if clean_text:
+            return clean_text, None
 
-    clean_text = clean_extracted_ocr_text(extracted_text or "")
-    if not clean_text:
-        return "", "No readable text detected in image."
+    # Determine if failure was due to no text vs. no engine available
+    if err and "not available" in err and err_tess and "error" in str(err_tess):
+        return "", "Image text extraction is currently unavailable because no OCR backend is configured."
 
-    return clean_text, None
+    return "", "No readable text detected in image."

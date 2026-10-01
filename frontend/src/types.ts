@@ -82,6 +82,8 @@ export interface AnalysisResult {
   claims_analyzed?: PerClaimResult[] | null;
   extracted_image_text?: string | null;
   image_preview?: string | null;
+  resolved_claim?: string | null;
+  question_intent?: string | null;
 }
 
 export interface HealthStatus {

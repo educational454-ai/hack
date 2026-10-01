@@ -113,3 +113,5 @@ class AnalysisResult(BaseModel):
     claims_analyzed: Optional[List[PerClaimResult]] = None
     extracted_image_text: Optional[str] = None
     image_preview: Optional[str] = None
+    resolved_claim: Optional[str] = None
+    question_intent: Optional[str] = None

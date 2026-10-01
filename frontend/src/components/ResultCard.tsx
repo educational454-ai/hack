@@ -152,9 +152,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         <div className="verdict-meta">
           <span
             className="meta-pill"
-            title="Internal model verification confidence score (not a probability of truth)"
+            title="Model processing confidence score (not a probability of truth)"
           >
-            Verification Confidence: {Math.round(result.confidence_score * 100)}%
+            {result.verdict_title === "TEXT EXTRACTED" || result.question_intent === "text_extraction"
+              ? "Extraction Confidence"
+              : "Verification Confidence"}
+            : {Math.round(result.confidence_score * 100)}%
           </span>
           {typeof result.latency_seconds === "number" && result.latency_seconds > 0 ? (
             <span className="meta-pill">{result.latency_seconds}s</span>
