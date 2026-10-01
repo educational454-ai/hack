@@ -51,14 +51,21 @@ class TestTask81SyntheticEvidenceRemoval(unittest.TestCase):
     def test_retriever_returns_empty_on_search_exception(self):
         """Verifies that retrieve_search_candidates returns [] when search client fails."""
         from core.retriever import retrieve_search_candidates
+        active_patches = []
+        for target in ["ddgs.DDGS", "duckduckgo_search.DDGS"]:
+            try:
+                p = patch(target, side_effect=Exception("Search failed"))
+                p.start()
+                active_patches.append(p)
+            except (ImportError, ModuleNotFoundError, AttributeError):
+                pass
+
         try:
-            with patch("ddgs.DDGS", side_effect=Exception("Search failed")), \
-                 patch("duckduckgo_search.DDGS", side_effect=Exception("Search failed")):
-                candidates = retrieve_search_candidates(["unindexed query text"])
-                self.assertEqual(candidates, [])
-        except Exception:
             candidates = retrieve_search_candidates(["unindexed query text"])
             self.assertEqual(candidates, [])
+        finally:
+            for p in active_patches:
+                p.stop()
 
     def test_existing_retrieval_behavior_with_real_candidates(self):
         """Verifies that retrieval behavior is unchanged when real candidates exist."""
