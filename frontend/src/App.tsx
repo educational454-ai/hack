@@ -10,8 +10,30 @@ import { AnalysisResult, HistoryItem } from "./types";
 import { AlertCircle } from "lucide-react";
 
 const HISTORY_STORAGE_KEY = "misinfo_chat_history";
+const INTRO_STORAGE_KEY = "has_seen_intro_v1";
+
+const IntroSceneLazy = React.lazy(() => import("./components/IntroScene/IntroScene"));
 
 export const App: React.FC = () => {
+  const [showIntro, setShowIntro] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(INTRO_STORAGE_KEY) !== "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleCompleteIntro = () => {
+    setShowIntro(false);
+    try {
+      localStorage.setItem(INTRO_STORAGE_KEY, "true");
+    } catch {}
+  };
+
+  const handleReplayIntro = () => {
+    setShowIntro(true);
+  };
+
   const [claim, setClaim] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -131,9 +153,17 @@ export const App: React.FC = () => {
     setActiveHistoryId(null);
   };
 
+  if (showIntro) {
+    return (
+      <React.Suspense fallback={<div className="intro-overlay" style={{ backgroundColor: "#030712" }} />}>
+        <IntroSceneLazy onComplete={handleCompleteIntro} />
+      </React.Suspense>
+    );
+  }
+
   return (
     <div className="app-container">
-      <Header />
+      <Header onReplayIntro={handleReplayIntro} />
 
       <div className="app-layout">
         <LeftSidebar

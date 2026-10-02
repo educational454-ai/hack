@@ -1,8 +1,12 @@
 import React from "react";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, Play } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onReplayIntro?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onReplayIntro }) => {
   return (
     <header className="app-header">
       <div className="logo-group">
@@ -15,6 +19,16 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="header-actions">
+        {onReplayIntro && (
+          <button
+            className="replay-intro-btn"
+            onClick={onReplayIntro}
+            title="Replay intro animation"
+          >
+            <Play size={14} />
+            <span>Replay Intro</span>
+          </button>
+        )}
         <ThemeToggle />
       </div>
     </header>
