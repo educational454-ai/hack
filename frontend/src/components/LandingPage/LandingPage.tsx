@@ -6,14 +6,17 @@ import {
   Globe,
   FileText,
   Search,
-  CheckCircle2,
   AlertTriangle,
   Zap,
   Layers,
   Sparkles,
-  Link,
+  Link as LinkIcon,
   Image as ImageIcon,
   ExternalLink,
+  Lock,
+  Cpu,
+  ShieldCheck,
+  ChevronRight,
 } from "lucide-react";
 import "./landing.css";
 
@@ -24,6 +27,7 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
+  const [activePipelineStep, setActivePipelineStep] = useState(3); // 0-indexed active step
 
   // Track navbar glass blur state on scroll
   useEffect(() => {
@@ -36,6 +40,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Cycle active pipeline stage automatically every 4s unless hovered
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActivePipelineStep((prev) => (prev + 1) % 8);
+    }, 4500);
+    return () => clearInterval(interval);
   }, []);
 
   // IntersectionObserver for scroll-active progress dot indicator
@@ -60,7 +72,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
           }
         });
       },
-      { threshold: 0.3 }
+      { threshold: 0.25 }
     );
 
     sectionIds.forEach((id) => {
@@ -78,8 +90,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
     }
   };
 
+  const pipelineSteps = [
+    { step: "01", title: "CLAIM INPUT", desc: "Statement, article URL, or uploaded document image" },
+    { step: "02", title: "WEB RETRIEVAL", desc: "Multi-engine search gathering independent web evidence" },
+    { step: "03", title: "SOURCE QUALITY", desc: "Domain reputation classification & tier filtering" },
+    { step: "04", title: "SEMANTIC RELEVANCE", desc: "BGE-M3 dense vector passage re-ranking" },
+    { step: "05", title: "EVIDENCE GATE", desc: "Strict quality threshold filtering weak or noise snippets" },
+    { step: "06", title: "AI VERIFICATION", desc: "Hugging Face cross-encoder NLI model inference" },
+    { step: "07", title: "PROVENANCE", desc: "Canonical URL normalization & exact quote link mapping" },
+    { step: "08", title: "TRUTHFUL VERDICT", desc: "Score, neutral explanation, and transparent evidence list" },
+  ];
+
   return (
     <div className="landing-root">
+      {/* Background Ambient Gradients */}
+      <div className="landing-ambient-bg" />
+
       {/* Navbar */}
       <nav className={`landing-nav ${isScrolled ? "scrolled" : ""}`}>
         <div className="landing-brand" onClick={() => scrollToSection("hero")}>
@@ -92,15 +118,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
         <ul className="landing-nav-links">
           <li>
             <span
-              className="landing-nav-link"
+              className={`landing-nav-link ${activeSection === "how-it-works" ? "active" : ""}`}
               onClick={() => scrollToSection("how-it-works")}
             >
-              How It Works
+              Architecture
             </span>
           </li>
           <li>
             <span
-              className="landing-nav-link"
+              className={`landing-nav-link ${activeSection === "sources" ? "active" : ""}`}
               onClick={() => scrollToSection("sources")}
             >
               Source Quality
@@ -108,15 +134,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
           </li>
           <li>
             <span
-              className="landing-nav-link"
-              onClick={() => scrollToSection("multimodal")}
+              className={`landing-nav-link ${activeSection === "preview" ? "active" : ""}`}
+              onClick={() => scrollToSection("preview")}
             >
-              Multimodal
+              Product Preview
             </span>
           </li>
           <li>
-            <span className="landing-nav-link" onClick={onNavigateToAnalyzer}>
-              Analyzer
+            <span
+              className={`landing-nav-link ${activeSection === "multimodal" ? "active" : ""}`}
+              onClick={() => scrollToSection("multimodal")}
+            >
+              Multimodal
             </span>
           </li>
         </ul>
@@ -128,7 +157,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
       </nav>
 
       {/* Sidebar Progress Dots */}
-      <aside className="landing-scroll-indicator">
+      <aside className="landing-scroll-indicator" aria-label="Section navigation">
         {[
           "hero",
           "speed",
@@ -137,15 +166,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
           "evidence",
           "preview",
           "multimodal",
+          "transparent",
           "final-cta",
         ].map((id) => (
           <div
             key={id}
-            className={`scroll-indicator-dot ${
-              activeSection === id ? "active" : ""
-            }`}
+            className={`scroll-indicator-dot ${activeSection === id ? "active" : ""}`}
             onClick={() => scrollToSection(id)}
-            title={id}
+            title={id.replace("-", " ").toUpperCase()}
           />
         ))}
       </aside>
@@ -156,16 +184,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
 
         <div className="hero-badge">
           <Sparkles size={14} />
-          <span>Evidence-First Misinformation Analyzer</span>
+          <span>EVIDENCE-FIRST MISINFORMATION ANALYZER</span>
         </div>
 
         <h1 className="hero-title">
-          VERIFY <span className="hero-title-highlight">WHAT YOU SEE.</span>
+          VERIFY <br />
+          <span className="hero-title-highlight">WHAT YOU SEE.</span>
         </h1>
 
         <p className="hero-subtitle">
-          AI-powered misinformation analysis built around evidence, source quality,
-          semantic relevance, and transparent verification.
+          AI-powered claim analysis built around real web evidence, source quality tiers,
+          dense vector relevance, and fully transparent, traceable verdicts.
         </p>
 
         <div className="hero-cta-group">
@@ -176,298 +205,405 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
 
           <button
             className="secondary-btn"
-            onClick={() => scrollToSection("speed")}
+            onClick={() => scrollToSection("how-it-works")}
           >
             <span>EXPLORE HOW IT WORKS</span>
             <ArrowDown size={16} />
           </button>
         </div>
 
-        {/* Hero Abstract Evidence Composition */}
-        <div className="hero-composition">
-          <div className="composition-node-center">
-            <ShieldAlert size={36} />
+        {/* Hero Abstract Product Visual: CLAIM -> EVIDENCE -> VERIFICATION */}
+        <div className="hero-product-visualization">
+          <div className="vis-connector-line" />
+          
+          <div className="vis-node vis-claim-node">
+            <div className="vis-node-badge">INPUT CLAIM</div>
+            <div className="vis-node-content">
+              <FileText size={16} className="vis-icon-orange" />
+              <span>"India banned UPI transactions in 2025"</span>
+            </div>
+            <div className="vis-node-meta">Text • URL • Image OCR</div>
           </div>
 
-          <div className="composition-card left">
-            <FileText size={16} color="#f97316" />
-            <span>Extracted Claim Proposition</span>
+          <div className="vis-center-engine">
+            <div className="vis-engine-core">
+              <ShieldAlert size={28} />
+            </div>
+            <span className="vis-engine-label">TRUTHGUARD VERIFICATION ENGINE</span>
+            <div className="vis-pulse-ring" />
           </div>
 
-          <div className="composition-card right">
-            <Globe size={16} color="#38bdf8" />
-            <span>Real-time Web Evidence</span>
+          <div className="vis-node vis-verdict-node">
+            <div className="vis-node-badge badge-red">VERDICT</div>
+            <div className="vis-node-content">
+              <ShieldCheck size={16} className="vis-icon-green" />
+              <span className="vis-verdict-title">CONTRADICTED</span>
+            </div>
+            <div className="vis-node-meta">Confidence: 95% • 3 Sources</div>
           </div>
 
-          <div className="composition-card bottom">
-            <CheckCircle2 size={16} color="#22c55e" />
-            <span>Truthful Provenance Validation</span>
+          {/* Floating evidence indicators */}
+          <div className="vis-float-card float-1">
+            <Globe size={13} color="#38bdf8" />
+            <span>Primary Domain: rbi.org.in</span>
+          </div>
+
+          <div className="vis-float-card float-2">
+            <Cpu size={13} color="#f97316" />
+            <span>NLI Entailment: Contradiction</span>
           </div>
         </div>
       </section>
 
+      {/* Section Divider */}
+      <div className="section-divider-line" />
+
       {/* Section 1: Information Moves Fast */}
       <section id="speed" className="landing-section speed-section">
+        <span className="section-kicker">THE MISINFORMATION LANDSCAPE</span>
         <h2 className="huge-heading">
           INFORMATION MOVES <br />
-          <span style={{ color: "#f97316" }}>FASTER THAN VERIFICATION.</span>
+          <span className="text-orange">FASTER THAN VERIFICATION.</span>
         </h2>
 
-        <p className="hero-subtitle" style={{ margin: "0 auto" }}>
-          Claims spread across articles, social posts, images, and webpages.
+        <p className="hero-subtitle">
+          Claims spread across articles, social feeds, images, and headlines.
           The challenge is not finding information—it is determining what evidence
-          actually supports it.
+          actually supports or contradicts it.
         </p>
 
         <div className="speed-grid">
           <div className="speed-card">
             <div className="speed-card-icon">
-              <Zap size={22} />
+              <Zap size={20} />
             </div>
             <h3 className="speed-card-title">Unfiltered Velocity</h3>
             <p className="speed-card-desc">
-              Millions of unverified statements propagate across digital networks
-              every minute before fact-checking occurs.
+              Unverified statements propagate across digital networks in seconds, long before manual fact-checking can respond.
             </p>
           </div>
 
           <div className="speed-card">
             <div className="speed-card-icon">
-              <AlertTriangle size={22} />
+              <AlertTriangle size={20} />
             </div>
             <h3 className="speed-card-title">Contextual Noise</h3>
             <p className="speed-card-desc">
-              Manipulated headlines, viral memes, and out-of-context quotes easily
-              obscure original factual context.
+              Manipulated headlines, viral memes, and out-of-context quotes easily obscure original factual context.
             </p>
           </div>
 
           <div className="speed-card">
             <div className="speed-card-icon">
-              <Search size={22} />
+              <Search size={20} />
             </div>
             <h3 className="speed-card-title">Evidence Disconnect</h3>
             <p className="speed-card-desc">
-              Traditional search engines surface matching text keywords without
-              verifying underlying factual truth probability.
+              Traditional search engines return text keyword matches without evaluating factual truth probability.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Section 2: Evidence Before Conclusions (Architecture Pipeline) */}
+      {/* Section Divider */}
+      <div className="section-divider-line" />
+
+      {/* Section 2: Evidence Architecture Pipeline (8 Stages) */}
       <section id="how-it-works" className="landing-section pipeline-section">
         <div className="hero-badge">
           <Layers size={14} />
-          <span>System Architecture</span>
+          <span>VERIFICATION PIPELINE</span>
         </div>
 
         <h2 className="huge-heading">
           EVIDENCE BEFORE <br />
-          <span style={{ color: "#f97316" }}>CONCLUSIONS.</span>
+          <span className="text-orange">CONCLUSIONS.</span>
         </h2>
 
-        <p className="hero-subtitle" style={{ margin: "0 auto" }}>
+        <p className="hero-subtitle">
           Every claim passes through a structured 8-stage verification pipeline
-          before generating a grounded assessment.
+          to ensure rigorous, reproducible assessment.
         </p>
 
         <div className="pipeline-flow">
-          {[
-            { step: "01", title: "CLAIM INPUT", desc: "Statement, article URL, or uploaded document image" },
-            { step: "02", title: "WEB RETRIEVAL", desc: "Multi-engine web search gathering raw web evidence" },
-            { step: "03", title: "SOURCE QUALITY", desc: "Domain reputation classification & tier filtering" },
-            { step: "04", title: "SEMANTIC RELEVANCE", desc: "BGE-M3 dense vector passage re-ranking" },
-            { step: "05", title: "EVIDENCE GATE", desc: "Strict quality threshold filtering weak or noise snippets" },
-            { step: "06", title: "AI VERIFICATION", desc: "Hugging Face cross-encoder NLI model inference" },
-            { step: "07", title: "PROVENANCE VALIDATION", desc: "Canonical URL normalization & quote link mapping" },
-            { step: "08", title: "TRUTHFUL VERDICT", desc: "Score, neutral explanation, and transparent evidence list" },
-          ].map((item, idx) => (
-            <div
-              key={item.step}
-              className={`pipeline-item ${idx === 2 || idx === 5 ? "active" : ""}`}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <span className="pipeline-step-num">{item.step}</span>
-                <span className="pipeline-step-title">{item.title}</span>
+          {pipelineSteps.map((item, idx) => {
+            const isActive = idx === activePipelineStep;
+            return (
+              <div
+                key={item.step}
+                className={`pipeline-item ${isActive ? "active" : ""}`}
+                onMouseEnter={() => setActivePipelineStep(idx)}
+              >
+                <div className="pipeline-item-left">
+                  <span className="pipeline-step-num">{item.step}</span>
+                  <span className="pipeline-step-title">{item.title}</span>
+                </div>
+                <span className="pipeline-step-desc">{item.desc}</span>
+                {isActive && <div className="pipeline-active-indicator" />}
               </div>
-              <span className="pipeline-step-desc">{item.desc}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
+
+      {/* Section Divider */}
+      <div className="section-divider-line" />
 
       {/* Section 3: Source Quality */}
       <section id="sources" className="landing-section source-section">
+        <span className="section-kicker">SOURCE EVALUATION</span>
         <h2 className="huge-heading">
           NOT ALL SOURCES <br />
-          <span style={{ color: "#38bdf8" }}>CARRY THE SAME WEIGHT.</span>
+          <span className="text-orange">CARRY THE SAME WEIGHT.</span>
         </h2>
 
-        <p className="hero-subtitle" style={{ margin: "0 auto" }}>
-          Source domain authority is evaluated before evidence passages contribute
+        <p className="hero-subtitle">
+          Source domain authority is classified before evidence passages contribute
           to final verification scores.
         </p>
 
-        <div className="source-layers-grid">
-          <div className="source-layer-card primary">
-            <span className="source-layer-badge">TIER 1</span>
-            <h3 className="source-layer-title">PRIMARY SOURCES</h3>
-            <p className="source-layer-desc">
-              Official government records, academic archives, peer-reviewed studies,
-              and direct primary documentation.
+        <div className="source-tier-structure">
+          <div className="source-tier-card tier-primary">
+            <div className="tier-header">
+              <span className="tier-badge badge-primary">TIER 1 — DOMINANT</span>
+              <span className="tier-weight-label">PRIMARY SOURCES</span>
+            </div>
+            <h3 className="tier-title">Official & Academic Records</h3>
+            <p className="tier-desc">
+              Government portals (.gov, .gov.in, .edu), official central bank publications, peer-reviewed scientific journals, and primary documentation.
             </p>
           </div>
 
-          <div className="source-layer-card secondary">
-            <span className="source-layer-badge">TIER 2</span>
-            <h3 className="source-layer-title">SECONDARY REPORTING</h3>
-            <p className="source-layer-desc">
-              Established news organizations, verified investigative reporting,
-              and credible reference publications.
+          <div className="source-tier-card tier-secondary">
+            <div className="tier-header">
+              <span className="tier-badge badge-secondary">TIER 2 — SUPPORTING</span>
+              <span className="tier-weight-label">SECONDARY REPORTING</span>
+            </div>
+            <h3 className="tier-title">Established News Outlets</h3>
+            <p className="tier-desc">
+              Recognized major news organizations, verified investigative reporting, and reputable reference publications.
             </p>
           </div>
 
-          <div className="source-layer-card low">
-            <span className="source-layer-badge">TIER 3</span>
-            <h3 className="source-layer-title">LOW CONFIDENCE</h3>
-            <p className="source-layer-desc">
-              Unverified personal blogs, automated content feeds, or unknown
-              domain reputations filtered by evidence gates.
+          <div className="source-tier-card tier-low">
+            <div className="tier-header">
+              <span className="tier-badge badge-low">TIER 3 — QUIET</span>
+              <span className="tier-weight-label">LOW CONFIDENCE</span>
+            </div>
+            <h3 className="tier-title">Unverified Web Content</h3>
+            <p className="tier-desc">
+              Personal blogs, unverified social posts, or automated content feeds filtered out by strict evidence gates.
             </p>
           </div>
         </div>
       </section>
+
+      {/* Section Divider */}
+      <div className="section-divider-line" />
 
       {/* Section 4: Semantic Relevance vs Truth */}
       <section id="evidence" className="landing-section semantic-section">
+        <span className="section-kicker">TECHNICAL DISTINCTION</span>
         <h2 className="huge-heading">
-          RELEVANCE IS <span style={{ color: "#f97316" }}>NOT TRUTH.</span>
+          RELEVANCE IS <span className="text-orange">NOT TRUTH.</span>
         </h2>
 
-        <div className="semantic-box">
-          <div className="semantic-quote">
-            "Semantic similarity helps identify relevant passages across the web.
-            It does not itself determine whether a claim is factual."
-          </div>
+        <div className="semantic-container">
+          <blockquote className="semantic-editorial-quote">
+            "Dense vector models locate passages discussing the same topic.
+            Cross-encoder NLI inference then evaluates logical entailment versus contradiction to determine factual truth."
+          </blockquote>
 
-          <p className="hero-subtitle" style={{ margin: 0 }}>
-            Dense vector models (like BGE-M3) locate passages discussing the same topic.
-            Cross-encoder inference models then evaluate logical entailment versus
-            contradiction to determine factual truth.
-          </p>
+          <div className="semantic-flow-diagram">
+            <div className="sem-step">
+              <span className="sem-step-num">01</span>
+              <span className="sem-step-label">CLAIM</span>
+            </div>
+            <ChevronRight size={18} className="sem-arrow" />
+            <div className="sem-step">
+              <span className="sem-step-num">02</span>
+              <span className="sem-step-label">RELEVANT PASSAGE</span>
+            </div>
+            <ChevronRight size={18} className="sem-arrow" />
+            <div className="sem-step">
+              <span className="sem-step-num">03</span>
+              <span className="sem-step-label">SOURCE TIER</span>
+            </div>
+            <ChevronRight size={18} className="sem-arrow" />
+            <div className="sem-step sem-highlight">
+              <span className="sem-step-num">04</span>
+              <span className="sem-step-label">VERIFICATION</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Section 5: Real Analyzer Preview */}
+      {/* Section Divider */}
+      <div className="section-divider-line" />
+
+      {/* Section 5: Analyzer Showcase (Hero Product Visual Anchor) */}
       <section id="preview" className="landing-section showcase-section">
         <div className="hero-badge">
           <Sparkles size={14} />
-          <span>Product Showcase</span>
+          <span>ACTUAL PRODUCT INTERFACE</span>
         </div>
 
         <h2 className="huge-heading">THE ANALYZER IN ACTION</h2>
 
-        <div className="showcase-preview-card">
-          <div className="showcase-header">
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <ShieldAlert size={20} color="#f97316" />
-              <span style={{ fontWeight: 700, color: "#ffffff" }}>
-                Claim Analysis: "India banned UPI in 2025"
-              </span>
+        <p className="hero-subtitle">
+          Interactive claim analysis view showcasing exact verdict scoring, passage retrieval, and source provenance.
+        </p>
+
+        <div className="showcase-frame">
+          <div className="showcase-topbar">
+            <div className="showcase-window-dots">
+              <span className="dot dot-red" />
+              <span className="dot dot-yellow" />
+              <span className="dot dot-green" />
             </div>
-            <span className="showcase-preview-tag">EXAMPLE ANALYSIS</span>
+            <div className="showcase-url-bar">
+              <Lock size={12} color="#f97316" />
+              <span>truthguard.ai/analyzer</span>
+            </div>
+            <span className="showcase-preview-tag">PRODUCT PREVIEW / EXAMPLE ANALYSIS</span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-            <div style={{ background: "rgba(30, 41, 59, 0.5)", padding: "1.25rem", borderRadius: "12px" }}>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600, marginBottom: "0.5rem" }}>
-                VERDICT
-              </div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#ef4444" }}>
-                🔴 CONTRADICTED
-              </div>
-              <div style={{ fontSize: "0.85rem", color: "#cbd5e1", marginTop: "0.5rem" }}>
-                Verification Confidence: 95.0%
+          <div className="showcase-body">
+            <div className="showcase-claim-header">
+              <div className="showcase-claim-label">INPUT CLAIM PROPOSITION</div>
+              <div className="showcase-claim-text">
+                "India has officially banned UPI digital payments starting from 2025."
               </div>
             </div>
 
-            <div style={{ background: "rgba(30, 41, 59, 0.5)", padding: "1.25rem", borderRadius: "12px" }}>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600, marginBottom: "0.5rem" }}>
-                INDEPENDENT EVIDENCE
+            <div className="showcase-verdict-banner">
+              <div className="showcase-verdict-main">
+                <div className="verdict-pill-red">
+                  <ShieldAlert size={18} />
+                  <span>CONTRADICTED</span>
+                </div>
+                <div className="verdict-confidence">
+                  <span>Verification Confidence:</span>
+                  <strong>95.0%</strong>
+                </div>
               </div>
-              <div style={{ fontSize: "0.9rem", color: "#ffffff", fontWeight: 600 }}>
-                3 Independent Source Domains
+              <p className="verdict-summary-text">
+                Official statements from NPCI and RBI confirm that UPI payments remain operational and fully supported across all banking networks.
+              </p>
+            </div>
+
+            <div className="showcase-evidence-grid">
+              <div className="showcase-evidence-card">
+                <div className="evidence-card-header">
+                  <span className="evidence-source-domain">npci.org.in</span>
+                  <span className="evidence-tier-tag">TIER 1 PRIMARY</span>
+                </div>
+                <p className="evidence-snippet">
+                  "NPCI confirms UPI operations continue standard processing across all participating member banks without disruption."
+                </p>
+                <div className="evidence-meta-row">
+                  <span>Relevance: 0.94</span>
+                  <span>NLI: Contradiction (96%)</span>
+                </div>
               </div>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-                npci.org.in, rbi.org.in, pressinformationbureau.gov.in
+
+              <div className="showcase-evidence-card">
+                <div className="evidence-card-header">
+                  <span className="evidence-source-domain">rbi.org.in</span>
+                  <span className="evidence-tier-tag">TIER 1 PRIMARY</span>
+                </div>
+                <p className="evidence-snippet">
+                  "Reserve Bank of India reiterates digital payment infrastructure stability and ongoing expansion initiatives."
+                </p>
+                <div className="evidence-meta-row">
+                  <span>Relevance: 0.91</span>
+                  <span>NLI: Contradiction (94%)</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div style={{ marginTop: "1.5rem", textAlign: "center" }}>
-            <button className="primary-btn" onClick={onNavigateToAnalyzer}>
-              <span>TRY THE ANALYZER</span>
-              <ArrowRight size={18} />
-            </button>
+            <div className="showcase-action-bar">
+              <button className="primary-btn" onClick={onNavigateToAnalyzer}>
+                <span>TRY THE ANALYZER</span>
+                <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* Section Divider */}
+      <div className="section-divider-line" />
 
       {/* Section 6: Multimodal Inputs */}
-      <section id="multimodal" className="landing-section">
-        <div style={{ textAlign: "center" }}>
-          <h2 className="huge-heading">
-            VERIFY MORE <span style={{ color: "#38bdf8" }}>THAN TEXT.</span>
-          </h2>
-          <p className="hero-subtitle" style={{ margin: "0 auto" }}>
-            Native multi-modal input processing for images, documents, URLs, and queries.
-          </p>
-        </div>
+      <section id="multimodal" className="landing-section multimodal-section">
+        <span className="section-kicker">MULTIMODAL CAPABILITY</span>
+        <h2 className="huge-heading">
+          VERIFY MORE <span className="text-orange">THAN TEXT.</span>
+        </h2>
+        <p className="hero-subtitle">
+          Process claim propositions from news clips, documents, web URLs, or direct statements.
+        </p>
 
-        <div className="multimodal-grid">
-          <div className="multimodal-card">
-            <h3 className="multimodal-card-title">
-              <ImageIcon size={20} color="#f97316" />
-              <span>IMAGE ANALYSIS</span>
-            </h3>
-            <p className="hero-subtitle" style={{ fontSize: "0.9rem", margin: 0 }}>
-              RapidOCR extracts claims from news clips, flyers, and memes.
+        <div className="multimodal-paths">
+          {/* Path 1: Image */}
+          <div className="multimodal-path-card">
+            <div className="path-icon-wrapper">
+              <ImageIcon size={22} className="text-orange" />
+            </div>
+            <h3 className="path-title">IMAGE / DOCUMENT ANALYSIS</h3>
+            <p className="path-desc">
+              RapidOCR extracts text claims from screenshots, news clips, and flyers.
             </p>
-            <div className="multimodal-steps">
-              <div className="multimodal-step-pill">1. Upload Image / Screenshot</div>
-              <div className="multimodal-step-pill">2. RapidOCR Text Extraction</div>
-              <div className="multimodal-step-pill">3. Proposition Normalization</div>
-              <div className="multimodal-step-pill">4. Web Evidence Verification</div>
+            <div className="path-flow-line">
+              <span className="flow-step">IMAGE</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">OCR</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">CLAIM</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">EVIDENCE</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">VERDICT</span>
             </div>
           </div>
 
-          <div className="multimodal-card">
-            <h3 className="multimodal-card-title">
-              <Link size={20} color="#38bdf8" />
-              <span>URL VERIFICATION</span>
-            </h3>
-            <p className="hero-subtitle" style={{ fontSize: "0.9rem", margin: 0 }}>
-              Extracts context directly from article links and web documents.
+          {/* Path 2: URL */}
+          <div className="multimodal-path-card">
+            <div className="path-icon-wrapper">
+              <LinkIcon size={22} color="#38bdf8" />
+            </div>
+            <h3 className="path-title">URL & WEB ARTICLE VERIFICATION</h3>
+            <p className="path-desc">
+              Extract context directly from article links and web documents.
             </p>
-            <div className="multimodal-steps">
-              <div className="multimodal-step-pill">1. Paste Web Article URL</div>
-              <div className="multimodal-step-pill">2. Scraping & Context Parsing</div>
-              <div className="multimodal-step-pill">3. Independent Web Retrieval</div>
-              <div className="multimodal-step-pill">4. Cross-Domain Assessment</div>
+            <div className="path-flow-line">
+              <span className="flow-step">URL</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">CONTEXT</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">RETRIEVAL</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">EVIDENCE</span>
+              <span className="flow-arr">→</span>
+              <span className="flow-step">VERDICT</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Section 7: Transparent Results */}
+      {/* Section Divider */}
+      <div className="section-divider-line" />
+
+      {/* Section 7: Transparent Traceable Verdicts */}
       <section id="transparent" className="landing-section transparent-section">
+        <span className="section-kicker">PROVENANCE & INTEGRITY</span>
         <h2 className="huge-heading">
-          A VERDICT YOU CAN <span style={{ color: "#f97316" }}>TRACE.</span>
+          A VERDICT YOU CAN <span className="text-orange">TRACE.</span>
         </h2>
 
-        <p className="hero-subtitle" style={{ margin: "0 auto" }}>
-          Every verdict links directly to its source URL, extracted snippet, and provenance details.
+        <p className="hero-subtitle">
+          Every verdict links directly back to its source URL, extracted snippet, and provenance details.
         </p>
 
         <div className="transparent-chain">
@@ -483,14 +619,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
         </div>
       </section>
 
-      {/* Section 8: Final CTA */}
+      {/* Final CTA */}
       <section id="final-cta" className="landing-section final-cta-section">
         <h2 className="final-cta-title">
           DON'T JUST BELIEVE IT. <br />
-          <span style={{ color: "#f97316" }}>VERIFY IT.</span>
+          <span className="text-orange">VERIFY IT.</span>
         </h2>
 
-        <p className="hero-subtitle" style={{ margin: "0 auto 3rem auto" }}>
+        <p className="hero-subtitle" style={{ marginBottom: "3rem" }}>
           Evidence before conclusions.
         </p>
 
@@ -511,3 +647,4 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigateToAnalyzer }
 };
 
 export default LandingPage;
+
