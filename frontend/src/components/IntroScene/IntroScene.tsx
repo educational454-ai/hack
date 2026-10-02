@@ -7,8 +7,7 @@ interface IntroSceneProps {
   onComplete: () => void;
 }
 
-const STAGE_DURATION_MS = 5000; // 5 seconds per stage
-const TOTAL_STAGES = 6;
+const TOTAL_STAGES = 7;
 
 const PIPELINE_STEPS = [
   { id: "claim", label: "CLAIM" },
@@ -37,24 +36,37 @@ export const IntroScene: React.FC<IntroSceneProps> = ({ onComplete }) => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Stage timer loop
+  // Discrete Stage Timers (Zero per-frame React state re-renders!)
   useEffect(() => {
-    if (stage >= TOTAL_STAGES || isExiting) return;
+    if (isExiting) return;
+
+    // Stage duration timeline schedule (in milliseconds)
+    const stageDurations: { [key: number]: number } = {
+      1: 4000, // 0-4s: Information Discovery
+      2: 5000, // 4-9s: Propagation
+      3: 4000, // 9-13s: Signal & Noise
+      4: 3000, // 13-16s: Hard Pause ("WHAT SHOULD YOU BELIEVE?")
+      5: 6000, // 16-22s: Evidence Transformation
+      6: 3000, // 22-25s: Verification Pulse
+    };
+
+    const duration = stageDurations[stage];
+    if (!duration) return; // Stage 7 is final hold stage
 
     const timer = setTimeout(() => {
       setStage((prev) => Math.min(prev + 1, TOTAL_STAGES));
-    }, STAGE_DURATION_MS);
+    }, duration);
 
     return () => clearTimeout(timer);
   }, [stage, isExiting]);
 
-  // Sequentially illuminate pipeline steps during Stage 5
+  // Stage 5 & 6 Pipeline Step Illumination
   useEffect(() => {
-    if (stage === 5) {
+    if (stage === 5 || stage === 6) {
       setActivePipelineIdx(0);
       const interval = setInterval(() => {
         setActivePipelineIdx((prev) => (prev < PIPELINE_STEPS.length - 1 ? prev + 1 : prev));
-      }, 900);
+      }, 1000);
       return () => clearInterval(interval);
     }
   }, [stage]);
@@ -62,16 +74,17 @@ export const IntroScene: React.FC<IntroSceneProps> = ({ onComplete }) => {
   const handleComplete = useCallback(() => {
     if (isExiting) return;
     setIsExiting(true);
-    // Smooth exit zoom/fade transition before calling parent callback
+    // Smooth transition zoom forward into analyzer
     setTimeout(() => {
       onComplete();
-    }, 700);
+    }, 600);
   }, [isExiting, onComplete]);
 
   const handleStageSelect = (stageNum: number) => {
     setStage(stageNum);
   };
 
+  // Progress percentage computed directly from discrete stage index
   const progressPercentage = Math.min((stage / TOTAL_STAGES) * 100, 100);
 
   return (
@@ -93,10 +106,10 @@ export const IntroScene: React.FC<IntroSceneProps> = ({ onComplete }) => {
 
       {/* UI Content Layer */}
       <div className="intro-ui-layer">
-        {/* Top Header */}
+        {/* Top Header Bar */}
         <header className="intro-header-bar">
           <div className="intro-brand-badge">
-            <Shield size={16} />
+            <Shield size={15} />
             <span>AI Misinformation Analyzer</span>
           </div>
 
@@ -106,52 +119,58 @@ export const IntroScene: React.FC<IntroSceneProps> = ({ onComplete }) => {
           </button>
         </header>
 
-        {/* Central Stage Content */}
+        {/* Central Stage Content Container */}
         <div className="intro-stage-container">
+          {/* Scene 01: Information Discovery (0-4s) */}
           {stage === 1 && (
-            <>
-              <h2 className="intro-stage-title">Information Surrounds Us</h2>
+            <div className="intro-text-wrapper stage-fade-in">
+              <h2 className="intro-stage-title">INFORMATION SURROUNDS US</h2>
               <p className="intro-stage-subtitle">
-                Millions of signals, statements, and sources flow across global networks every second.
+                Signals, statements, and sources move through connected global networks.
               </p>
-            </>
+            </div>
           )}
 
+          {/* Scene 02: Propagation (4-9s) */}
           {stage === 2 && (
-            <>
+            <div className="intro-text-wrapper stage-fade-in">
               <h2 className="intro-stage-title">Propagation Across Networks</h2>
               <p className="intro-stage-subtitle">
                 A single claim rapidly spreads, branches out, and amplifies across connected nodes.
               </p>
-            </>
+            </div>
           )}
 
+          {/* Scene 03: Signal & Noise (9-13s) */}
           {stage === 3 && (
-            <>
+            <div className="intro-text-wrapper stage-fade-in">
               <h2 className="intro-stage-title">Signal & Noise Converge</h2>
               <p className="intro-stage-subtitle">
                 Unverified headlines, emotional context, and noise obscure original facts.
               </p>
               <div className="intro-noise-fragments">
-                <div className="intro-noise-tag">"BREAKING..."</div>
-                <div className="intro-noise-tag">"SCIENTISTS CONFIRM..."</div>
-                <div className="intro-noise-tag">"SHOCKING NEWS..."</div>
-                <div className="intro-noise-tag">"100% TRUE..."</div>
+                <div className="intro-noise-tag">BREAKING...</div>
+                <div className="intro-noise-tag">VIRAL...</div>
+                <div className="intro-noise-tag">JUST IN...</div>
+                <div className="intro-noise-tag">SHOCKING...</div>
+                <div className="intro-noise-tag">100% TRUE...</div>
               </div>
-            </>
+            </div>
           )}
 
+          {/* Scene 04: Hard Pause / Freeze (13-16s) */}
           {stage === 4 && (
-            <>
-              <h2 className="intro-stage-title">WHAT SHOULD YOU BELIEVE?</h2>
-              <p className="intro-stage-subtitle">
+            <div className="intro-text-wrapper freeze-fade-in">
+              <h2 className="intro-freeze-title">WHAT SHOULD YOU BELIEVE?</h2>
+              <p className="intro-freeze-subtitle">
                 Without objective evidence and source analysis, truth becomes impossible to discern.
               </p>
-            </>
+            </div>
           )}
 
-          {stage === 5 && (
-            <>
+          {/* Scene 05 & 06: Evidence Transformation & Verification (16-25s) */}
+          {(stage === 5 || stage === 6) && (
+            <div className="intro-text-wrapper stage-fade-in">
               <h2 className="intro-stage-title">Evidence-First Verification</h2>
               <p className="intro-stage-subtitle">
                 Transforming unverified claims into grounded, multi-source evidence analysis.
@@ -167,17 +186,18 @@ export const IntroScene: React.FC<IntroSceneProps> = ({ onComplete }) => {
                   </React.Fragment>
                 ))}
               </div>
-            </>
+            </div>
           )}
 
-          {stage === 6 && (
-            <div className="intro-reveal-card">
+          {/* Scene 07: Product Reveal (25s+) */}
+          {stage === 7 && (
+            <div className="intro-reveal-card card-fade-in">
               <h1 className="intro-reveal-title">AI MISINFORMATION ANALYZER</h1>
               <p className="intro-reveal-sub">"Evidence before conclusions."</p>
 
               <button className="intro-get-started-btn" onClick={handleComplete}>
                 <span>GET STARTED</span>
-                <ArrowRight size={20} />
+                <ArrowRight size={20} className="arrow-icon" />
               </button>
             </div>
           )}
