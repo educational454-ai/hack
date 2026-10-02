@@ -1,15 +1,15 @@
 import React from "react";
-import { ShieldAlert, Play } from "lucide-react";
+import { ShieldAlert, ArrowLeft } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface HeaderProps {
-  onReplayIntro?: () => void;
+  onNavigateHome?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onReplayIntro }) => {
+export const Header: React.FC<HeaderProps> = ({ onNavigateHome }) => {
   return (
     <header className="app-header">
-      <div className="logo-group">
+      <div className="logo-group" onClick={onNavigateHome} style={{ cursor: onNavigateHome ? "pointer" : "default" }}>
         <div className="logo-icon">
           <ShieldAlert size={22} />
         </div>
@@ -19,14 +19,14 @@ export const Header: React.FC<HeaderProps> = ({ onReplayIntro }) => {
       </div>
 
       <div className="header-actions">
-        {onReplayIntro && (
+        {onNavigateHome && (
           <button
             className="replay-intro-btn"
-            onClick={onReplayIntro}
-            title="Replay intro animation"
+            onClick={onNavigateHome}
+            title="Return to Landing Page"
           >
-            <Play size={14} />
-            <span>Replay Intro</span>
+            <ArrowLeft size={14} />
+            <span>Landing Page</span>
           </button>
         )}
         <ThemeToggle />

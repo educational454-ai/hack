@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { ClaimInput } from "./components/ClaimInput";
 import { PipelineSteps } from "./components/PipelineSteps";
@@ -10,28 +10,26 @@ import { AnalysisResult, HistoryItem } from "./types";
 import { AlertCircle } from "lucide-react";
 
 const HISTORY_STORAGE_KEY = "misinfo_chat_history";
-const INTRO_STORAGE_KEY = "has_seen_intro_v1";
 
-const IntroSceneLazy = React.lazy(() => import("./components/IntroScene/IntroScene"));
+const LandingPageLazy = React.lazy(() => import("./components/LandingPage/LandingPage"));
 
 export const App: React.FC = () => {
-  const [showIntro, setShowIntro] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(INTRO_STORAGE_KEY) !== "true";
-    } catch {
-      return false;
-    }
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    return window.location.pathname;
   });
 
-  const handleCompleteIntro = () => {
-    setShowIntro(false);
-    try {
-      localStorage.setItem(INTRO_STORAGE_KEY, "true");
-    } catch {}
-  };
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
-  const handleReplayIntro = () => {
-    setShowIntro(true);
+  const navigateTo = (path: string) => {
+    window.history.pushState({}, "", path);
+    setCurrentPath(path);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const [claim, setClaim] = useState("");
@@ -153,17 +151,19 @@ export const App: React.FC = () => {
     setActiveHistoryId(null);
   };
 
-  if (showIntro) {
+  // Render Landing Page on '/' (or any non-analyzer route)
+  if (currentPath !== "/analyzer") {
     return (
-      <React.Suspense fallback={<div className="intro-overlay" style={{ backgroundColor: "#030712" }} />}>
-        <IntroSceneLazy onComplete={handleCompleteIntro} />
+      <React.Suspense fallback={<div style={{ backgroundColor: "#030712", minHeight: "100vh" }} />}>
+        <LandingPageLazy onNavigateToAnalyzer={() => navigateTo("/analyzer")} />
       </React.Suspense>
     );
   }
 
+  // Render Analyzer Application on '/analyzer'
   return (
     <div className="app-container">
-      <Header onReplayIntro={handleReplayIntro} />
+      <Header onNavigateHome={() => navigateTo("/")} />
 
       <div className="app-layout">
         <LeftSidebar
