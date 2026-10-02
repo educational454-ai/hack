@@ -1,4 +1,4 @@
-/* landing.css — Phase 3.1 Targeted Visual Refinement System */
+/* landing.css — Phase 3.2 5-Section Consolidated Design System */
 
 /* Base & Root Tokens */
 :root {
@@ -37,14 +37,14 @@
   max-width: 1400px;
   height: 100%;
   background: 
-    radial-gradient(circle at 50% 15%, rgba(249, 115, 22, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 12%, rgba(249, 115, 22, 0.09) 0%, transparent 40%),
     radial-gradient(circle at 20% 45%, rgba(249, 115, 22, 0.04) 0%, transparent 35%),
     radial-gradient(circle at 80% 75%, rgba(6, 182, 212, 0.03) 0%, transparent 35%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Fixed Navbar */
+/* Fixed Navbar (4 Section links + CTA) */
 .landing-nav {
   position: fixed;
   top: 0;
@@ -150,7 +150,7 @@
   box-shadow: 0 8px 25px rgba(249, 115, 22, 0.45);
 }
 
-/* Sidebar Progress Indicator */
+/* Sidebar Progress Indicator (5 Dots) */
 .landing-scroll-indicator {
   position: fixed;
   right: 2rem;
@@ -160,7 +160,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 1.15rem;
 }
 
 .scroll-indicator-dot {
@@ -227,7 +227,7 @@
 .hero-subtitle {
   font-size: 1.2rem;
   color: var(--landing-text-muted);
-  max-width: 660px;
+  max-width: 680px;
   line-height: 1.65;
   margin: 0 auto 2.5rem auto;
   font-weight: 400;
@@ -277,7 +277,7 @@
   color: #ffffff;
 }
 
-/* Hero Section */
+/* SECTION 01 — HERO / WHY */
 .hero-section {
   min-height: calc(100vh - 80px);
   padding-top: 8.5rem;
@@ -343,7 +343,7 @@
   margin-bottom: 3.5rem;
 }
 
-/* Hero Abstract Product Visual: CLAIM -> EVIDENCE -> VERIFICATION */
+/* Hero Abstract Product Visual */
 .hero-product-visualization {
   position: relative;
   width: 100%;
@@ -400,8 +400,8 @@
   margin-bottom: 0.4rem;
 }
 
-.vis-node-badge.badge-red {
-  color: #ef4444;
+.vis-node-badge.badge-green {
+  color: #22c55e;
 }
 
 .vis-node-content {
@@ -484,64 +484,8 @@
   border-color: rgba(249, 115, 22, 0.3);
 }
 
-/* Speed Section (Information Moves Fast) */
-.speed-section {
-  text-align: center;
-}
-
-.speed-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-top: 3.5rem;
-  text-align: left;
-}
-
-.speed-card {
-  background: var(--landing-bg-card);
-  border: 1px solid var(--landing-border);
-  border-top: 2px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 1.85rem;
-  backdrop-filter: blur(14px);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.speed-card:hover {
-  border-color: var(--landing-border-orange);
-  border-top-color: var(--landing-orange);
-  transform: translateY(-3px);
-  background: rgba(15, 23, 42, 0.65);
-}
-
-.speed-card-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: rgba(249, 115, 22, 0.1);
-  color: var(--landing-orange);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1.15rem;
-}
-
-.speed-card-title {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0 0 0.5rem 0;
-}
-
-.speed-card-desc {
-  font-size: 0.9rem;
-  color: var(--landing-text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* Evidence Architecture Pipeline Section (8 Stages) */
-.pipeline-section {
+/* SECTION 02 — THE EVIDENCE ENGINE */
+.engine-section {
   text-align: center;
 }
 
@@ -613,151 +557,95 @@
   border-bottom-left-radius: 12px;
 }
 
-/* Source Quality Section */
-.source-section {
-  text-align: center;
-}
-
-.source-tier-structure {
-  display: flex;
-  flex-direction: column;
+/* Engine Sub-cards (Source Quality & Relevance vs Truth) */
+.engine-sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5rem;
-  margin-top: 3.5rem;
-  text-align: left;
+  margin-top: 3rem;
 }
 
-.source-tier-card {
+.engine-sub-card {
   background: var(--landing-bg-card);
   border: 1px solid var(--landing-border);
   border-radius: 16px;
-  padding: 2rem 2.25rem;
+  padding: 1.75rem;
   backdrop-filter: blur(16px);
-  position: relative;
-  transition: all 0.3s ease;
+  text-align: left;
 }
 
-.source-tier-card.tier-primary {
-  border-left: 4px solid #22c55e;
-  background: rgba(34, 197, 94, 0.04);
+.engine-sub-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 1.25rem 0;
 }
 
-.source-tier-card.tier-secondary {
-  border-left: 4px solid var(--landing-cyan-accent);
-  background: rgba(6, 182, 212, 0.03);
-}
-
-.source-tier-card.tier-low {
-  border-left: 4px solid #94a3b8;
-  opacity: 0.75;
-}
-
-.tier-header {
+.source-tier-mini-list {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tier-mini-item {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.tier-mini-item strong {
+  font-size: 0.85rem;
+  color: #ffffff;
+  display: block;
+}
+
+.tier-mini-item p {
+  margin: 0.2rem 0 0 0;
+  font-size: 0.82rem;
+  color: var(--landing-text-muted);
+  line-height: 1.5;
 }
 
 .tier-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 4px;
   text-transform: uppercase;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
 }
 
 .badge-primary { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
 .badge-secondary { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
 .badge-low { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
 
-.tier-weight-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--landing-text-muted);
-}
-
-.tier-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0 0 0.5rem 0;
-}
-
-.tier-desc {
-  font-size: 0.92rem;
-  color: var(--landing-text-muted);
-  line-height: 1.6;
-  margin: 0;
-}
-
-/* Semantic Relevance vs Truth Section */
-.semantic-section {
-  text-align: center;
-}
-
-.semantic-container {
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid var(--landing-border-orange);
-  border-radius: 20px;
-  padding: 3rem;
-  margin-top: 3rem;
-  text-align: left;
-  backdrop-filter: blur(16px);
-}
-
-.semantic-editorial-quote {
-  font-size: 1.4rem;
+.semantic-editorial-quote-compact {
+  font-size: 1.05rem;
   font-weight: 600;
   color: #ffffff;
-  line-height: 1.55;
-  margin: 0 0 2.5rem 0;
+  line-height: 1.5;
+  margin: 0 0 1.5rem 0;
   border-left: 3px solid var(--landing-orange);
-  padding-left: 1.5rem;
+  padding-left: 1rem;
 }
 
-.semantic-flow-diagram {
+.semantic-flow-line-compact {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  background: rgba(3, 7, 18, 0.6);
-  border: 1px solid var(--landing-border);
-  border-radius: 12px;
-  padding: 1.25rem 1.75rem;
-  flex-wrap: wrap;
-}
-
-.sem-step {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.sem-step-num {
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: var(--landing-text-muted);
-  font-family: monospace;
-}
-
-.sem-step-label {
-  font-size: 0.85rem;
+  gap: 0.4rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #cbd5e1;
-  letter-spacing: 0.05em;
+  flex-wrap: wrap;
+  background: rgba(3, 7, 18, 0.6);
+  padding: 0.65rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.sem-step.sem-highlight .sem-step-label {
-  color: var(--landing-orange);
-}
-
-.sem-arrow {
-  color: var(--landing-text-muted);
-}
-
-/* Analyzer Showcase (Hero Product Visual) */
+/* SECTION 03 — THE ANALYZER (Hero Product Visual) */
 .showcase-section {
   text-align: center;
 }
@@ -942,16 +830,19 @@
   margin-top: 1.5rem;
 }
 
-/* Multimodal Section */
+/* SECTION 04 — MULTIMODAL + TRACEABILITY */
 .multimodal-section {
   text-align: center;
 }
 
-.multimodal-paths {
+.multimodal-combined-box {
+  margin-top: 3.5rem;
+}
+
+.multimodal-paths-compact {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.75rem;
-  margin-top: 3.5rem;
   text-align: left;
 }
 
@@ -1012,17 +903,29 @@
   font-weight: 800;
 }
 
-/* Transparent Traceable Section */
-.transparent-section {
+.traceability-compact-banner {
+  margin-top: 2rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--landing-border-orange);
+  border-radius: 16px;
+  padding: 1.75rem;
   text-align: center;
 }
 
-.transparent-chain {
+.trace-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--landing-orange);
+  display: block;
+  margin-bottom: 1.25rem;
+}
+
+.transparent-chain-compact {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0.85rem;
-  margin-top: 3.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
@@ -1030,10 +933,10 @@
   background: var(--landing-bg-card);
   border: 1px solid var(--landing-border-orange);
   color: #ffffff;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 0.85rem 1.4rem;
+  padding: 0.75rem 1.25rem;
   border-radius: 10px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
 }
@@ -1044,7 +947,7 @@
   font-weight: 800;
 }
 
-/* Final CTA Section */
+/* SECTION 05 — FINAL CTA */
 .final-cta-section {
   text-align: center;
   padding: 9rem 2rem;
@@ -1063,7 +966,7 @@
 
 /* Reduced Motion Support */
 @media (prefers-reduced-motion: reduce) {
-  .landing-root *, .primary-btn, .secondary-btn, .speed-card, .pipeline-item {
+  .landing-root *, .primary-btn, .secondary-btn, .pipeline-item {
     animation: none !important;
     transition: none !important;
   }
@@ -1109,4 +1012,5 @@
     display: none;
   }
 }
+
 
