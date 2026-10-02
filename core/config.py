@@ -44,6 +44,11 @@ class Config:
         return os.getenv("ALLOW_MOCK_FALLBACK", "true").lower() in ("true", "1", "yes")
 
     @property
+    def google_fact_check_api_key(self) -> str:
+        load_dotenv(BASE_DIR / ".env")
+        return os.getenv("GOOGLE_FACT_CHECK_API_KEY", "").strip()
+
+    @property
     def low_memory_mode(self) -> bool:
         return os.getenv("LOW_MEMORY_MODE", "true").lower() in ("true", "1", "yes")
 

@@ -8,6 +8,7 @@ from .schemas import (
     AnalysisResult,
     AssessmentVerdict,
     ClaimType,
+    FactCheckItem,
     SourceMetadata,
     RelevantImage,
 )
@@ -19,6 +20,11 @@ from .ranker import rank_evidence_chunks, rank_and_filter_images
 from .evidence_gate import filter_evidence_for_verification
 from .verifier import verify_claim_evidence, VERDICT_SYMBOLS, formulate_direct_statement
 from .url_normalizer import normalize_url
+from .fact_check_api import (
+    search_fact_checks,
+    fact_checks_to_evidence_items,
+    aggregate_fact_check_verdict,
+)
 
 from .url_pipeline import detect_input_mode, analyze_url_with_question, analyze_url_only
 
@@ -26,7 +32,19 @@ logger = logging.getLogger(__name__)
 
 
 def analyze_claim_single(claim_text: str) -> AnalysisResult:
-    """Executes the full 8-step evidence-first verification pipeline for a single claim string."""
+    """Executes the full evidence-first verification pipeline for a single claim string.
+
+    Pipeline steps:
+      1. Claim parsing & classification
+      2. Google Fact Check Tools API lookup (parallel, PRIMARY tier)
+      3. DuckDuckGo web search retrieval
+      4. Source metadata & tiering
+      5. Full-page passage extraction
+      6. BGE-M3 semantic similarity ranking
+      7. Evidence quality gate
+      8. HF LLM / heuristic verdict
+      9. Relevant image retrieval
+    """
     start_time = time.time()
     logger.info(f"Starting analysis for claim: '{claim_text}'")
 
@@ -34,7 +52,7 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     parsed = parse_claim(claim_text)
     logger.info(f"Claim classified as: {parsed.claim_type.value}")
 
-    # Subjective early-return
+    # Subjective early-return (no fact-check needed)
     if parsed.claim_type == ClaimType.SUBJECTIVE_OPINION:
         verdict, conf, expl, supp, cont, limits = verify_claim_evidence(parsed, [])
         sym, title = VERDICT_SYMBOLS[verdict]
@@ -57,14 +75,51 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
             targeted_answer=direct_answer,
         )
 
-    # Step 2: Web Search Retrieval
+    # ── Step 2: Google Fact Check Tools API ────────────────────────────────────
+    raw_fact_checks: list = []
+    fact_check_items: List[FactCheckItem] = []
+    fc_evidence_chunks: list = []
+
+    gfc_key = config.google_fact_check_api_key
+    if gfc_key:
+        try:
+            raw_fact_checks = search_fact_checks(
+                claim_text, api_key=gfc_key, max_results=5
+            )
+            # Convert to FactCheckItem schema objects for the response
+            fact_check_items = [
+                FactCheckItem(
+                    claim_text=fc["claim_text"],
+                    claimant=fc.get("claimant"),
+                    claim_date=fc.get("claim_date"),
+                    rating=fc["rating"],
+                    verdict_signal=fc["verdict_signal"],
+                    publisher_name=fc["publisher_name"],
+                    publisher_site=fc.get("publisher_site"),
+                    rating_url=fc["rating_url"],
+                    title=fc["title"],
+                )
+                for fc in raw_fact_checks
+            ]
+            # Convert to evidence dict format (PRIMARY tier) for the ranking step
+            fc_evidence_chunks = fact_checks_to_evidence_items(raw_fact_checks)
+            logger.info(
+                f"Fact Check API: {len(fact_check_items)} result(s) found, "
+                f"injecting as PRIMARY evidence."
+            )
+        except Exception as fc_exc:
+            logger.warning(f"Fact Check API call failed: {fc_exc}")
+    else:
+        logger.debug("GOOGLE_FACT_CHECK_API_KEY not set — skipping Fact Check API step.")
+
+    # ── Step 3: Web Search Retrieval ───────────────────────────────────────────
     logger.info(f"Searching web using queries: {parsed.extracted_queries}")
     candidates = retrieve_search_candidates(
         parsed.extracted_queries, max_results=config.max_search_results
     )
     logger.info(f"Retrieved {len(candidates)} search candidates.")
 
-    # Step 3: Source Metadata & Tiering
+    # ── Step 4: Source Metadata & Tiering ─────────────────────────────────────
     all_sources: List[SourceMetadata] = []
     seen_urls = set()
     for item in candidates:
@@ -75,38 +130,71 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
                 seen_urls.add(norm_u)
                 all_sources.append(build_source_metadata(u, item.get("title", "")))
 
-    # Step 4: Passage Extraction & Boilerplate Cleaning
+    # ── Step 5: Passage Extraction & Boilerplate Cleaning ─────────────────────
     extracted_chunks = extract_evidence_from_candidates(
         candidates, timeout=config.http_timeout
     )
     logger.info(f"Extracted {len(extracted_chunks)} candidate passages.")
 
-    # Step 5: BGE-M3 Semantic Similarity Ranking
+    # Prepend fact-check passages (they get highest priority in ranking)
+    all_chunks = fc_evidence_chunks + extracted_chunks
+
+    # ── Step 6: BGE-M3 Semantic Similarity Ranking ────────────────────────────
     ranked_evidence = rank_evidence_chunks(
-        parsed.original_text, extracted_chunks, top_k=config.top_k_evidence
+        parsed.original_text, all_chunks, top_k=config.top_k_evidence + len(fc_evidence_chunks)
     )
     logger.info(f"Selected top {len(ranked_evidence)} most relevant evidence chunks.")
 
-    # Step 5.5: Evidence Quality Gate
+    # ── Step 7: Evidence Quality Gate ─────────────────────────────────────────
     usable_evidence, rejected_evidence = filter_evidence_for_verification(ranked_evidence)
     logger.info(
-        f"Evidence Quality Gate: retained {len(usable_evidence)} usable evidence items, "
+        f"Evidence Quality Gate: retained {len(usable_evidence)} usable items, "
         f"filtered out {len(rejected_evidence)} items."
     )
 
-    # Step 6 & 7: Claim <-> Evidence Comparative Verification (HF LLM)
+    # ── Step 8: HF LLM / Heuristic Verdict ────────────────────────────────────
     verdict, conf, expl, supp, cont, limits = verify_claim_evidence(
         parsed, usable_evidence
     )
     sym, title = VERDICT_SYMBOLS[verdict]
 
-    # Retrieve relevant images for the claim with semantic relevance filtering
+    # ── Fact-Check Verdict Override ────────────────────────────────────────────
+    # If the pipeline returned insufficient evidence but Fact Check publishers
+    # have a clear consensus, trust the publishers.
+    if (
+        verdict == AssessmentVerdict.INSUFFICIENT_EVIDENCE
+        and raw_fact_checks
+    ):
+        fc_signal = aggregate_fact_check_verdict(raw_fact_checks)
+        if fc_signal:
+            fc_verdict_str, fc_conf = fc_signal
+            verdict_map = {
+                "contradicted": AssessmentVerdict.CONTRADICTED,
+                "supported": AssessmentVerdict.SUPPORTED,
+                "conflicting": AssessmentVerdict.CONFLICTING_EVIDENCE,
+            }
+            if fc_verdict_str in verdict_map:
+                verdict = verdict_map[fc_verdict_str]
+                conf = fc_conf
+                sym, title = VERDICT_SYMBOLS[verdict]
+                publishers = list(
+                    dict.fromkeys(fc["publisher_name"] for fc in raw_fact_checks)
+                )[:3]
+                pub_str = ", ".join(publishers)
+                logger.info(
+                    f"Fact-check override: verdict upgraded to {title} "
+                    f"based on {pub_str}."
+                )
+                expl = (
+                    f"Google Fact Check Tools found {len(raw_fact_checks)} "
+                    f"published fact-check(s) from {pub_str} rating this claim "
+                    f'as "{raw_fact_checks[0]["rating"]}". ' + expl
+                )
+
+    # ── Step 9: Relevant Image Retrieval ──────────────────────────────────────
     relevant_images: List[RelevantImage] = []
     try:
-        raw_images = retrieve_relevant_images(
-            parsed.original_text,
-            max_images=8,
-        )
+        raw_images = retrieve_relevant_images(parsed.original_text, max_images=8)
         relevant_images = rank_and_filter_images(
             claim=parsed.original_text,
             raw_images=raw_images,
@@ -114,7 +202,7 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
             min_threshold=0.45,
         )
     except Exception as img_ex:
-        logger.warning(f"Could not retrieve/instantiate images: {img_ex}")
+        logger.warning(f"Could not retrieve/rank images: {img_ex}")
 
     direct_answer = formulate_direct_statement(parsed.original_text, verdict)
     if not expl.startswith("No,") and not expl.startswith("Yes,") and not expl.startswith("The statement"):
@@ -141,6 +229,7 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
         evidence_limitations=limits,
         all_sources=all_sources,
         relevant_images=relevant_images,
+        fact_checks=fact_check_items,
         latency_seconds=elapsed,
         mode="claim",
         targeted_answer=direct_answer,

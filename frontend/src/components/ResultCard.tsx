@@ -7,11 +7,13 @@ import {
   CheckCircle2,
   HelpCircle,
   Image as ImageIcon,
+  ShieldCheck,
 } from "lucide-react";
 import {
   AnalysisResult,
   EvidenceItem,
   RelevantImage,
+  FactCheckItem,
 } from "../types";
 
 interface ResultCardProps {
@@ -176,7 +178,10 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
       )}
 
-      {/* 3. Why? Evidence Synthesis */}
+      {/* 3. Google Fact-Checked By (if available) */}
+      <FactCheckSection factChecks={result.fact_checks || []} />
+
+      {/* 4. Why? Evidence Synthesis */}
       <div className="explanation-card">
         <h3 className="card-heading">
           <BookOpen size={19} className="heading-icon" />
@@ -439,6 +444,67 @@ const SummaryEvidenceCard: React.FC<{ item: EvidenceItem }> = ({ item }) => {
     </div>
   );
 };
+
+/* --- Fact-Check Section Component --- */
+const SIGNAL_STYLE: Record<string, { bg: string; text: string; label: string }> = {
+  contradicted:          { bg: "#fde8e8", text: "#b91c1c", label: "False / Misleading" },
+  supported:             { bg: "#d1fae5", text: "#065f46", label: "True / Verified" },
+  conflicting:           { bg: "#fef3c7", text: "#92400e", label: "Mixed / Disputed" },
+  insufficient_evidence: { bg: "#f3f4f6", text: "#374151", label: "Unverified" },
+};
+
+const FactCheckSection: React.FC<{ factChecks: FactCheckItem[] }> = ({ factChecks }) => {
+  if (!factChecks || factChecks.length === 0) return null;
+
+  return (
+    <div className="card-section fact-check-section">
+      <h3 className="card-heading">
+        <ShieldCheck size={19} className="heading-icon" />
+        Fact-Checked By ({factChecks.length} {factChecks.length === 1 ? "publisher" : "publishers"})
+      </h3>
+      <p className="visual-evidence-disclaimer">
+        Results from Google Fact Check Tools — verified by independent fact-checking organisations.
+      </p>
+      <div className="fact-check-grid">
+        {factChecks.map((fc, idx) => {
+          const style = SIGNAL_STYLE[fc.verdict_signal] || SIGNAL_STYLE.insufficient_evidence;
+          const dateStr = fc.claim_date
+            ? new Date(fc.claim_date).toLocaleDateString("en-US", { year: "numeric", month: "short" })
+            : null;
+
+          return (
+            <div key={idx} className="fact-check-card">
+              <div className="fact-check-header">
+                <span className="fact-check-publisher">{fc.publisher_name}</span>
+                <span
+                  className="fact-check-rating-badge"
+                  style={{ backgroundColor: style.bg, color: style.text }}
+                >
+                  {fc.rating}
+                </span>
+              </div>
+              <p className="fact-check-claim">"{fc.claim_text.slice(0, 120)}{fc.claim_text.length > 120 ? "…" : ""}"</p>
+              <div className="fact-check-footer">
+                {dateStr && <span className="fact-check-date">{dateStr}</span>}
+                {fc.claimant && <span className="fact-check-claimant">via {fc.claimant}</span>}
+                <a
+                  href={fc.rating_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="details-toggle-btn"
+                  title={`Read full fact-check by ${fc.publisher_name}`}
+                >
+                  Full fact-check <ExternalLink size={12} />
+                </a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 
 
 

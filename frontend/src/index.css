@@ -2063,3 +2063,74 @@ body {
 
 
 
+
+/* -- Google Fact Check Tools Section ----------------------------------- */
+.fact-check-section {
+  border-left: 3px solid #6366f1;
+}
+
+.fact-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.fact-check-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: box-shadow 0.15s ease;
+}
+
+.fact-check-card:hover {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.fact-check-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.fact-check-publisher {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary, #111827);
+}
+
+.fact-check-rating-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.fact-check-claim {
+  font-size: 0.83rem;
+  color: var(--text-secondary, #4b5563);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.fact-check-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.fact-check-date,
+.fact-check-claimant {
+  font-size: 0.75rem;
+  color: var(--text-muted, #9ca3af);
+}

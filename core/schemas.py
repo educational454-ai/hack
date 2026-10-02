@@ -68,6 +68,19 @@ class RelevantImage(BaseModel):
     relevance_score: Optional[float] = None
 
 
+class FactCheckItem(BaseModel):
+    """A single fact-check result from the Google Fact Check Tools API."""
+    claim_text: str
+    claimant: Optional[str] = None
+    claim_date: Optional[str] = None
+    rating: str                          # Raw publisher rating e.g. "False", "Misleading"
+    verdict_signal: str                  # Normalised: "contradicted" | "supported" | "conflicting" | "insufficient_evidence"
+    publisher_name: str
+    publisher_site: Optional[str] = None
+    rating_url: str
+    title: str
+
+
 class WebpageMetadata(BaseModel):
     url: str
     domain: str
@@ -103,6 +116,9 @@ class AnalysisResult(BaseModel):
     all_sources: List[SourceMetadata] = Field(default_factory=list)
     relevant_images: List[RelevantImage] = Field(default_factory=list)
     latency_seconds: Optional[float] = None
+
+    # Google Fact Check Tools API results
+    fact_checks: List[FactCheckItem] = Field(default_factory=list)
 
     # Task 13 Mode Extensions
     mode: Optional[str] = "claim"

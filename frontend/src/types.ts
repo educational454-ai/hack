@@ -60,6 +60,18 @@ export interface PerClaimResult {
   contradicting_evidence: EvidenceItem[];
 }
 
+export interface FactCheckItem {
+  claim_text: string;
+  claimant?: string | null;
+  claim_date?: string | null;
+  rating: string;
+  verdict_signal: string; // "contradicted" | "supported" | "conflicting" | "insufficient_evidence"
+  publisher_name: string;
+  publisher_site?: string | null;
+  rating_url: string;
+  title: string;
+}
+
 export interface AnalysisResult {
   claim: string;
   claim_type: ClaimType;
@@ -74,6 +86,7 @@ export interface AnalysisResult {
   all_sources: SourceMetadata[];
   relevant_images?: RelevantImage[];
   latency_seconds?: number | null;
+  fact_checks?: FactCheckItem[];
   mode?: "claim" | "url" | "url_question" | "image" | null;
   webpage?: WebpageMetadata | null;
   user_question?: string | null;
