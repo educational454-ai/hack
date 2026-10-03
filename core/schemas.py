@@ -31,12 +31,30 @@ class AssessmentVerdict(str, Enum):
     SUBJECTIVE_OPINION = "subjective_opinion"   # 🔵 Statement isn't objectively verifiable
 
 
+class FactCheckReference(BaseModel):
+    title: str
+    rating: str                       # e.g., "False", "Misleading", "Verified"
+    fact_checker: str                 # e.g., "AltNews", "BoomLive", "Snopes", "AFP"
+    review_date: Optional[str] = None
+    review_url: str
+
+
+class PublisherTransparencyRecord(BaseModel):
+    domain: str
+    total_audited_claims: int = 0
+    debunked_count: int = 0          # Found in ClaimReview as False / Misleading
+    verified_count: int = 0          # Found in ClaimReview as True / Verified
+    recent_reviews: List[FactCheckReference] = Field(default_factory=list)
+    credibility_modifier: float = 1.0 # 0.70x to 1.05x multiplier
+
+
 class SourceMetadata(BaseModel):
     url: str
     domain: str
     title: Optional[str] = ""
     tier: SourceTier
     tier_reason: str
+    publisher_record: Optional[PublisherTransparencyRecord] = None
 
 
 class EvidenceItem(BaseModel):
@@ -131,3 +149,10 @@ class AnalysisResult(BaseModel):
     image_preview: Optional[str] = None
     resolved_claim: Optional[str] = None
     question_intent: Optional[str] = None
+
+    # Multilingual Support Fields
+    detected_language: Optional[str] = "en"
+    detected_language_name: Optional[str] = "English"
+
+    # Publisher Transparency & Credibility Audit Records
+    publisher_transparency: List[PublisherTransparencyRecord] = Field(default_factory=list)

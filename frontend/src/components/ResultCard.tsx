@@ -8,12 +8,16 @@ import {
   HelpCircle,
   Image as ImageIcon,
   ShieldCheck,
+  ShieldAlert,
+  Languages,
+  Award,
 } from "lucide-react";
 import {
   AnalysisResult,
   EvidenceItem,
   RelevantImage,
   FactCheckItem,
+  PublisherTransparencyRecord,
 } from "../types";
 
 interface ResultCardProps {
@@ -152,13 +156,22 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         </div>
 
         <div className="verdict-meta">
+          {result.detected_language_name && (
+            <span
+              className="meta-pill language-pill"
+              title={`Input detected as ${result.detected_language_name} (${result.detected_language}) - processed with cross-lingual embeddings`}
+            >
+              <Languages size={13} style={{ marginRight: "0.25rem", verticalAlign: "middle" }} />
+              {result.detected_language_name}
+            </span>
+          )}
           <span
             className="meta-pill"
-            title="Model processing confidence score (not a probability of truth)"
+            title="Strength and consensus of retrieved evidence supporting or refuting this claim"
           >
             {result.verdict_title === "TEXT EXTRACTED" || result.question_intent === "text_extraction"
-              ? "Extraction Confidence"
-              : "Verification Confidence"}
+              ? "Extraction Accuracy"
+              : "Evidence Strength"}
             : {Math.round(result.confidence_score * 100)}%
           </span>
           {typeof result.latency_seconds === "number" && result.latency_seconds > 0 ? (
@@ -180,6 +193,11 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
 
       {/* 3. Google Fact-Checked By (if available) */}
       <FactCheckSection factChecks={result.fact_checks || []} />
+
+      {/* 3.5. Source Transparency & Historical Audit Records */}
+      <PublisherTransparencySection
+        records={result.publisher_transparency || []}
+      />
 
       {/* 4. Why? Evidence Synthesis */}
       <div className="explanation-card">
@@ -225,7 +243,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
                     {c.verdict_symbol} {c.verdict_title}
                   </span>
                   <span className="relevance-tag">
-                    Confidence: {Math.round(c.confidence_score * 100)}%
+                    Evidence Strength: {Math.round(c.confidence_score * 100)}%
                   </span>
                 </div>
                 <p className="claim-analyzed-text">"{c.claim}"</p>
@@ -505,6 +523,100 @@ const FactCheckSection: React.FC<{ factChecks: FactCheckItem[] }> = ({ factCheck
   );
 };
 
+/* --- Source Transparency & Publisher Historical Audit Component --- */
+const PublisherTransparencySection: React.FC<{
+  records: PublisherTransparencyRecord[];
+}> = ({ records }) => {
+  if (!records || records.length === 0) return null;
 
+  // Filter to records that have either past audits or official recognition
+  const activeRecords = records.filter(
+    (r) => r.total_audited_claims > 0 || r.credibility_modifier !== 1.0
+  );
 
+  if (activeRecords.length === 0) return null;
 
+  return (
+    <div className="card-section transparency-section">
+      <h3 className="card-heading">
+        <Award size={19} className="heading-icon" />
+        Publisher Transparency & Historical Audit ({activeRecords.length}{" "}
+        {activeRecords.length === 1 ? "source" : "sources"})
+      </h3>
+      <p className="visual-evidence-disclaimer">
+        Empirical evaluation of cited publisher domains against Schema.org ClaimReview registries.
+      </p>
+      <div className="transparency-grid">
+        {activeRecords.map((rec, idx) => {
+          const hasDebunks = rec.debunked_count > 0;
+          const isOfficial = rec.credibility_modifier >= 1.05 && rec.total_audited_claims === 0;
+
+          return (
+            <div key={idx} className="transparency-card">
+              <div className="transparency-header">
+                <span className="transparency-domain">{rec.domain}</span>
+                {isOfficial ? (
+                  <span className="transparency-badge official">
+                    <ShieldCheck size={12} /> Official / Primary Authority
+                  </span>
+                ) : hasDebunks ? (
+                  <span className="transparency-badge caution">
+                    <ShieldAlert size={12} /> {rec.debunked_count} Debunked Claim(s)
+                  </span>
+                ) : (
+                  <span className="transparency-badge verified">
+                    <ShieldCheck size={12} /> Verified Track Record
+                  </span>
+                )}
+              </div>
+
+              <div className="transparency-stats">
+                {rec.total_audited_claims > 0 ? (
+                  <>
+                    <span className="stat-item">
+                      Audited Articles: <strong>{rec.total_audited_claims}</strong>
+                    </span>
+                    <span className="stat-item">
+                      Corroborated: <strong style={{ color: "#16a34a" }}>{rec.verified_count}</strong>
+                    </span>
+                    <span className="stat-item">
+                      Contradicted: <strong style={{ color: hasDebunks ? "#dc2626" : "inherit" }}>{rec.debunked_count}</strong>
+                    </span>
+                  </>
+                ) : isOfficial ? (
+                  <span className="stat-item official-note">
+                    Recognized institutional body with direct statutory or scientific mandate.
+                  </span>
+                ) : null}
+              </div>
+
+              {rec.recent_reviews && rec.recent_reviews.length > 0 && (
+                <div className="transparency-reviews">
+                  <span className="reviews-title">Recent Fact-Checks for this Domain:</span>
+                  {rec.recent_reviews.map((rev, revIdx) => (
+                    <div key={revIdx} className="review-item">
+                      <div className="review-meta">
+                        <span className="review-checker">{rev.fact_checker}</span>
+                        <span className={`review-rating ${rev.rating.toLowerCase().includes("false") ? "false" : ""}`}>
+                          {rev.rating}
+                        </span>
+                      </div>
+                      <a
+                        href={rev.review_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="review-link"
+                      >
+                        "{rev.title.slice(0, 95)}..." <ExternalLink size={10} />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};

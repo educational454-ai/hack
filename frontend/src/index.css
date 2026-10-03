@@ -2134,3 +2134,302 @@ body {
   font-size: 0.75rem;
   color: var(--text-muted, #9ca3af);
 }
+
+/* ==========================================================================
+   Voice Search Styles
+   ========================================================================== */
+
+.input-textarea-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.claim-textarea.listening-active {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.03) !important;
+}
+
+.voice-search-btn {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  z-index: 2;
+}
+
+.voice-search-btn:hover {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+  border-color: #6366f1;
+  transform: scale(1.08);
+}
+
+.voice-search-btn.active {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(0.95);
+  }
+}
+
+.voice-listening-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 0.65rem;
+  margin-top: -0.5rem;
+  margin-bottom: 1.1rem;
+}
+
+.voice-wave-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  animation: voice-bounce 1.2s infinite ease-in-out;
+}
+
+.voice-wave-dot.dot1 {
+  animation-delay: -0.32s;
+}
+
+.voice-wave-dot.dot2 {
+  animation-delay: -0.16s;
+}
+
+.voice-wave-dot.dot3 {
+  animation-delay: 0s;
+}
+
+@keyframes voice-bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.voice-status-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #ef4444;
+}
+
+[data-theme="dark"] .voice-listening-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.meta-pill.language-pill {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.3);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .meta-pill.language-pill {
+  background: rgba(129, 140, 248, 0.18);
+  color: #a5b4fc;
+  border-color: rgba(129, 140, 248, 0.35);
+}
+
+/* ==========================================================================
+   Publisher Transparency & Historical Audit Section
+   ========================================================================== */
+
+.transparency-section {
+  border-left: 3px solid #f59e0b;
+}
+
+.transparency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.85rem;
+}
+
+.transparency-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 10px;
+  padding: 0.95rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  transition: all 0.2s ease;
+}
+
+.transparency-card:hover {
+  border-color: #f59e0b;
+}
+
+.transparency-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.transparency-domain {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+}
+
+.transparency-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.transparency-badge.official {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+[data-theme="dark"] .transparency-badge.official {
+  background: rgba(3, 105, 161, 0.25);
+  color: #7dd3fc;
+  border-color: #0284c7;
+}
+
+.transparency-badge.caution {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+[data-theme="dark"] .transparency-badge.caution {
+  background: rgba(185, 28, 28, 0.25);
+  color: #fca5a5;
+  border-color: #b91c1c;
+}
+
+.transparency-badge.verified {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+[data-theme="dark"] .transparency-badge.verified {
+  background: rgba(22, 163, 74, 0.25);
+  color: #86efac;
+  border-color: #16a34a;
+}
+
+.transparency-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+  padding: 0.35rem 0;
+  border-top: 1px dashed var(--border-subtle, #f3f4f6);
+  border-bottom: 1px dashed var(--border-subtle, #f3f4f6);
+}
+
+.stat-item.official-note {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.transparency-reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+
+.reviews-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.76rem;
+  background: var(--bg-secondary, #f9fafb);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+}
+
+.review-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.review-checker {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.review-rating {
+  font-weight: 700;
+  font-size: 0.68rem;
+  color: #d97706;
+}
+
+.review-rating.false {
+  color: #dc2626;
+}
+
+.review-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.74rem;
+}
+
+.review-link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+

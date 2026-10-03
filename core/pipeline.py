@@ -25,6 +25,8 @@ from .fact_check_api import (
     fact_checks_to_evidence_items,
     aggregate_fact_check_verdict,
 )
+from .multilingual import detect_language, translate_to_english_for_verification
+from .publisher_audit import audit_sources_batch
 
 from .url_pipeline import detect_input_mode, analyze_url_with_question, analyze_url_only
 
@@ -47,6 +49,13 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     """
     start_time = time.time()
     logger.info(f"Starting analysis for claim: '{claim_text}'")
+
+    # Step 0: Multilingual Language Detection & Cross-Lingual Translation
+    lang_code, lang_name = detect_language(claim_text)
+    logger.info(f"[Multilingual] Detected language: {lang_name} ({lang_code})")
+    
+    # Generate English translation for universal search if non-English
+    claim_en = translate_to_english_for_verification(claim_text, lang_code) if lang_code != "en" else claim_text
 
     # Step 1: Claim Parser
     parsed = parse_claim(claim_text)
@@ -73,6 +82,8 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
             latency_seconds=elapsed,
             mode="claim",
             targeted_answer=direct_answer,
+            detected_language=lang_code,
+            detected_language_name=lang_name,
         )
 
     # ── Step 2: Google Fact Check Tools API ────────────────────────────────────
@@ -83,9 +94,17 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     gfc_key = config.google_fact_check_api_key
     if gfc_key:
         try:
+            # Query Fact Check API in original text and translated text
+            fc_lang = lang_code if lang_code in ("hi", "bn", "ta", "te", "mr", "gu") else "en"
             raw_fact_checks = search_fact_checks(
-                claim_text, api_key=gfc_key, max_results=5
+                claim_text, api_key=gfc_key, language_code=fc_lang, max_results=5
             )
+            # If no results in regional script and translated text exists, check in English
+            if not raw_fact_checks and claim_en != claim_text:
+                raw_fact_checks = search_fact_checks(
+                    claim_en, api_key=gfc_key, language_code="en", max_results=5
+                )
+
             # Convert to FactCheckItem schema objects for the response
             fact_check_items = [
                 FactCheckItem(
@@ -112,23 +131,40 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     else:
         logger.debug("GOOGLE_FACT_CHECK_API_KEY not set — skipping Fact Check API step.")
 
-    # ── Step 3: Web Search Retrieval ───────────────────────────────────────────
-    logger.info(f"Searching web using queries: {parsed.extracted_queries}")
+    # ── Step 3: Web Search Retrieval (Bilingual Queries) ──────────────────────
+    search_queries = list(parsed.extracted_queries)
+    if claim_en != claim_text:
+        search_queries.insert(0, claim_en)
+        search_queries.append(f"{claim_en} fact check")
+
+    logger.info(f"Searching web using queries: {search_queries}")
     candidates = retrieve_search_candidates(
-        parsed.extracted_queries, max_results=config.max_search_results
+        search_queries, max_results=config.max_search_results
     )
     logger.info(f"Retrieved {len(candidates)} search candidates.")
 
     # ── Step 4: Source Metadata & Tiering ─────────────────────────────────────
     all_sources: List[SourceMetadata] = []
     seen_urls = set()
+    candidate_domains: List[str] = []
     for item in candidates:
         u = item.get("url", "")
         if u:
             norm_u = normalize_url(u)
             if norm_u and norm_u not in seen_urls:
                 seen_urls.add(norm_u)
-                all_sources.append(build_source_metadata(u, item.get("title", "")))
+                source_meta = build_source_metadata(u, item.get("title", ""))
+                all_sources.append(source_meta)
+                if source_meta.domain:
+                    candidate_domains.append(source_meta.domain)
+
+    # ── Step 4.5: Publisher Track-Record & Transparency Audit ─────────────────
+    publisher_records = audit_sources_batch(
+        candidate_domains, api_key=config.google_fact_check_api_key
+    )
+    for source in all_sources:
+        if source.domain in publisher_records:
+            source.publisher_record = publisher_records[source.domain]
 
     # ── Step 5: Passage Extraction & Boilerplate Cleaning ─────────────────────
     extracted_chunks = extract_evidence_from_candidates(
@@ -139,9 +175,12 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     # Prepend fact-check passages (they get highest priority in ranking)
     all_chunks = fc_evidence_chunks + extracted_chunks
 
-    # ── Step 6: BGE-M3 Semantic Similarity Ranking ────────────────────────────
+    # ── Step 6: BGE-M3 Semantic Similarity Ranking with Publisher Modifiers ───
     ranked_evidence = rank_evidence_chunks(
-        parsed.original_text, all_chunks, top_k=config.top_k_evidence + len(fc_evidence_chunks)
+        parsed.original_text,
+        all_chunks,
+        top_k=config.top_k_evidence + len(fc_evidence_chunks),
+        publisher_records=publisher_records,
     )
     logger.info(f"Selected top {len(ranked_evidence)} most relevant evidence chunks.")
 
@@ -233,6 +272,9 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
         latency_seconds=elapsed,
         mode="claim",
         targeted_answer=direct_answer,
+        detected_language=lang_code,
+        detected_language_name=lang_name,
+        publisher_transparency=list(publisher_records.values()),
     )
 
 

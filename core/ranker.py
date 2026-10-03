@@ -112,6 +112,7 @@ def rank_evidence_chunks(
     claim: str,
     chunks: List[Dict[str, Any]],
     top_k: int = 5,
+    publisher_records: Optional[Dict[str, Any]] = None,
 ) -> List[EvidenceItem]:
     """Ranks extracted passage chunks based on semantic similarity to the claim.
     
@@ -150,21 +151,29 @@ def rank_evidence_chunks(
     if not similarity_scores or len(similarity_scores) != len(chunks):
         similarity_scores = [compute_lexical_similarity(claim, p) for p in passages]
 
-    # Combine similarity with source tier weight
+    # Combine similarity with source tier weight and publisher historical modifier
     scored_items: List[EvidenceItem] = []
     for idx, chunk in enumerate(chunks):
         base_sim = similarity_scores[idx] if idx < len(similarity_scores) else 0.0
         tier = chunk["source_tier"]
+        domain = chunk.get("domain", "")
 
         # Tier weighting
         tier_multiplier = 1.05 if tier == SourceTier.PRIMARY else (1.0 if tier == SourceTier.SECONDARY else 0.8)
-        final_score = round(base_sim * tier_multiplier, 4)
+
+        # Publisher historical credibility modifier (0.75x to 1.05x)
+        pub_modifier = 1.0
+        if publisher_records and domain in publisher_records:
+            pub_record = publisher_records[domain]
+            pub_modifier = getattr(pub_record, "credibility_modifier", 1.0)
+
+        final_score = round(base_sim * tier_multiplier * pub_modifier, 4)
 
         scored_items.append(EvidenceItem(
             id=f"ev_{idx+1}",
             url=chunk["url"],
             title=chunk["title"],
-            domain=chunk["domain"],
+            domain=domain,
             source_tier=tier,
             passage=chunk["passage"],
             similarity_score=final_score,

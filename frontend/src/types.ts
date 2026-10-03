@@ -11,12 +11,30 @@ export type AssessmentVerdict =
   | "conflicting_evidence"
   | "subjective_opinion";
 
+export interface FactCheckReference {
+  title: string;
+  rating: string;
+  fact_checker: string;
+  review_date?: string | null;
+  review_url: string;
+}
+
+export interface PublisherTransparencyRecord {
+  domain: string;
+  total_audited_claims: number;
+  debunked_count: number;
+  verified_count: number;
+  recent_reviews: FactCheckReference[];
+  credibility_modifier: number;
+}
+
 export interface SourceMetadata {
   url: string;
   domain: string;
   title: string;
   tier: SourceTier;
   tier_reason: string;
+  publisher_record?: PublisherTransparencyRecord | null;
 }
 
 export interface EvidenceItem {
@@ -97,6 +115,9 @@ export interface AnalysisResult {
   image_preview?: string | null;
   resolved_claim?: string | null;
   question_intent?: string | null;
+  detected_language?: string | null;
+  detected_language_name?: string | null;
+  publisher_transparency?: PublisherTransparencyRecord[];
 }
 
 export interface HealthStatus {

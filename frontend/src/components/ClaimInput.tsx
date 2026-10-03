@@ -1,5 +1,11 @@
-import React, { useRef, useState, useMemo } from "react";
-import { ArrowRight, Loader2, X, Plus } from "lucide-react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
+import { ArrowRight, Loader2, X, Plus, Mic } from "lucide-react";
+
+// SpeechRecognition type declarations for browsers (WebKit & standard)
+interface IWindow extends Window {
+  SpeechRecognition?: any;
+  webkitSpeechRecognition?: any;
+}
 
 interface ClaimInputProps {
   claim: string;
@@ -27,6 +33,86 @@ export const ClaimInput: React.FC<ClaimInputProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported, setVoiceSupported] = useState(true);
+  const recognitionRef = useRef<any>(null);
+  const claimRef = useRef(claim);
+  claimRef.current = claim;
+
+  // Initialize Web Speech Recognition
+  useEffect(() => {
+    const win = window as unknown as IWindow;
+    const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setVoiceSupported(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN"; // Default to Indian English / English
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        }
+      }
+
+      if (finalTranscript) {
+        const current = claimRef.current;
+        setClaim(current ? `${current.trim()} ${finalTranscript.trim()}` : finalTranscript.trim());
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.warn("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      try {
+        recognition.abort();
+      } catch {
+        // cleanup safe
+      }
+    };
+  }, [setClaim]);
+
+  const toggleVoiceInput = () => {
+    if (!voiceSupported) {
+      alert("Voice search is not supported on this browser. Try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        setIsListening(false);
+      }
+    } else {
+      try {
+        recognitionRef.current?.start();
+      } catch (err) {
+        console.warn("Error starting speech recognition:", err);
+      }
+    }
+  };
 
   // Generate temporary object URL for preview
   const imagePreviewUrl = useMemo(() => {
@@ -177,20 +263,52 @@ export const ClaimInput: React.FC<ClaimInputProps> = ({
           >
             <Plus size={20} strokeWidth={2.4} />
           </button>
-          <textarea
-            className="claim-textarea"
-            rows={3}
-            placeholder={
-              selectedImage
-                ? "Optional: Ask a specific question about this image, or leave blank to verify its text..."
-                : "Paste a claim, URL, or image (drag & drop / Ctrl+V screenshot)..."
-            }
-            value={claim}
-            onChange={(e) => setClaim(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-          />
+
+          <div className="input-textarea-wrapper">
+            <textarea
+              className={`claim-textarea ${isListening ? "listening-active" : ""}`}
+              rows={3}
+              placeholder={
+                isListening
+                  ? "🎙️ Listening... Speak your claim or query now..."
+                  : selectedImage
+                  ? "Optional: Ask a specific question about this image, or leave blank to verify its text..."
+                  : "Paste a claim, URL, image, or speak your query..."
+              }
+              value={claim}
+              onChange={(e) => setClaim(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            />
+
+            {/* Voice Search Mic Button inside textarea right-corner */}
+            <button
+              type="button"
+              className={`voice-search-btn ${isListening ? "active" : ""}`}
+              onClick={toggleVoiceInput}
+              disabled={isLoading}
+              title={isListening ? "Stop listening" : "Speak your claim (Voice Search)"}
+              aria-label={isListening ? "Stop listening" : "Speak your claim"}
+            >
+              {isListening ? (
+                <div className="voice-mic-pulsing">
+                  <Mic size={19} className="pulse-icon" />
+                </div>
+              ) : (
+                <Mic size={19} />
+              )}
+            </button>
+          </div>
         </div>
+
+        {isListening && (
+          <div className="voice-listening-banner">
+            <span className="voice-wave-dot dot1"></span>
+            <span className="voice-wave-dot dot2"></span>
+            <span className="voice-wave-dot dot3"></span>
+            <span className="voice-status-text">Listening to your voice in English / Hindi... (Click mic to stop)</span>
+          </div>
+        )}
 
         <div className="action-row">
           <div className="quick-claims">
