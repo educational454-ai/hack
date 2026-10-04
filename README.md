@@ -1,129 +1,157 @@
-# Evidence-First AI Misinformation Analyzer (AI-03)
+# TruthGuard AI — Evidence-First Misinformation Analyzer
 
-An **evidence-first** misinformation detection and verification engine. Unlike static LLM-based fact-checkers that rely on parametric memory (susceptible to hallucinations, temporal decay, and ungrounded assertions), TruthGuard AI executes an end-to-end multi-stage pipeline: real-time web retrieval, source authority classification, content extraction, semantic relevance ranking, quality gate filtering, grounded LLM analysis, and provenance validation.
-
----
-
-## 🎯 What It Does
-
-- **Real-Time Evidence Retrieval**: Searches live web sources per query rather than relying on frozen training parameters.
-- **Strict Evidence Grounding**: Verdict decisions and explanations are anchored in extracted evidence passages.
-- **Source Authority Classification**: Evaluates source reliability across government, academic, major news, and user-generated tiers.
-- **Provenance Validation**: Validates all model-cited evidence IDs against retrieved passages to eliminate hallucinated citations.
-- **Multimodal & Multi-Format Verification**: Supports plain text claims, webpage URLs, URL + contextual questions, and image OCR claims or flyers.
-- **Transparent Output**: Returns non-binary verdicts, confidence scores, semantic relevance percentages, evidence passages, source lists, and explicit limitations.
+An **evidence-first** misinformation detection and verification engine. Unlike static LLM-based fact-checkers that rely on parametric memory (which suffers from hallucinations, temporal decay, and ungrounded assertions), TruthGuard AI executes an end-to-end multi-stage pipeline: real-time web retrieval, source authority classification, content extraction, semantic relevance ranking, quality gate filtering, grounded LLM verification, and strict citation provenance validation.
 
 ---
 
-## ⚙️ How It Works
+## 📋 Overview
 
-### System Architecture
+### The Problem
+Generative AI models and LLMs often answer factual queries using static weights trained on historical data. When asked to evaluate modern news or complex claims, LLMs frequently hallucinate facts, confuse topically related articles with proof, or assert outdated information with high confidence.
+
+### The Solution
+TruthGuard AI enforces strict **evidence grounding**. Rather than letting an LLM generate assertions from memory:
+1. The system retrieves real-time web evidence and published fact-checks.
+2. It categorizes domains into explicit authority tiers (Primary, Secondary, Low-Confidence).
+3. It ranks extracted passages using `BAAI/bge-m3` semantic embeddings.
+4. It filters low-quality or off-topic snippets through a strict Evidence Quality Gate.
+5. It instructs the LLM (`meta-llama/Llama-3.3-70B-Instruct`) to evaluate logical entailment *exclusively* against retrieved passages.
+6. It validates model citation IDs against retrieved sources to eliminate hallucinated references.
+
+---
+
+## 🎯 Key Features
+
+- **Multi-Format Input Support**: Analyzes plain-text statements, public webpage URLs, URL + contextual questions, and uploaded image flyers or screenshots.
+- **Browser-Native Speech-to-Text (STT)**: Integrated microphone input allowing users to speak claims directly into the analyzer.
+- **Real-Time Web Retrieval**: Searches live web sources via DuckDuckGo Search (`ddgs`) with optional Google Fact Check Tools API lookup.
+- **Authoritative Source Tiering**: Classifies domains into Primary (government/academic), Secondary (reputable news/fact-checkers), and Low-Confidence (social media/blogs) tiers.
+- **BGE-M3 Semantic Ranking**: Scores passage relevance using vector embeddings, clearly separating topical relevance from truth probability.
+- **Evidence Quality Gate**: Filters out malformed URLs, short snippets, duplicates, and low-relevance passages before LLM verification.
+- **Grounded LLM Verification & Heuristic Fallback**: Evaluates claim stance using Llama 3.3 70B, with an intelligent heuristic fallback mode if API tokens are unconfigured or rate-limited.
+- **Strict Provenance Validation**: Rejects unmappable or hallucinated model evidence references.
+- **Transparent Output**: Returns non-binary verdicts, confidence scores, semantic relevance percentages, direct answers, evidence passages, source lists, and explicit limitations.
+
+---
+
+## ⚙️ System Architecture
 
 ```
-                      [User Input: Claim / URL / Image Payload]
-                                          │
-                                          ▼
-                              [Input Mode Detection]
-                                          │
-    ┌───────────────────────────────┬─────┴───────────────────────────────┐
-    ▼                               ▼                                     ▼
-[Text Claim Mode]         [URL Verification Mode]             [Image OCR Mode]
-    │                               │                                     │
-    ▼                               ▼                                     ▼
-[Claim Classification]    [Safe Page Fetch & Context]      [RapidOCR Text Extraction]
-    │                               │                                     │
-    ▼                               ▼                                     ▼
-[Real Web Search]         [Independent Evidence Search]    [Claim Proposition Extraction]
- (DDGS + Google Fact Check)          │                                     │
-    │                               │                                     │
-    └───────────────────────────────┼─────────────────────────────────────┘
-                                    │
-                                    ▼
-                         [Source Quality Tiering]
-                         (Primary / Secondary / Low Confidence)
-                                    │
-                                    ▼
-                       [Content Passage Extraction]
-                       (HTML Cleaning & Word Chunking)
-                                    │
-                                    ▼
-                       [BGE-M3 Semantic Ranking]
-                       (SentenceTransformers / HF API / Cosine Sim)
-                                    │
-                                    ▼
-                        [Evidence Quality Gate]
-                        (URL Validity, Length, Dedup, Tier Thresholds)
-                                    │
-                                    ▼
-                    [Grounded LLM Verification]
-                    (Llama 3.3 70B via HF Inference / Heuristic Fallback)
-                                    │
-                                    ▼
-                     [Provenance & Schema Validation]
-                     (Citation ID Mapping & Stance Consistency)
-                                    │
-                                    ▼
-                     [Structured Verdict + Synthesis]
+                       [User Input: Text Claim / URL / Image / Speech]
+                                             │
+                                             ▼
+                                 [Input Mode & Intent Detection]
+                                             │
+    ┌────────────────────────────────────────┼────────────────────────────────────────┐
+    ▼                                        ▼                                        ▼
+[Text Claim Mode]                  [URL Verification Mode]                    [Image OCR Mode]
+    │                                        │                                        │
+    ▼                                        ▼                                        ▼
+[Claim Parsing & Querying]        [Safe Page Fetch & Context]             [RapidOCR Text Extraction]
+    │                                        │                                        │
+    ▼                                        ▼                                        ▼
+[Real Web Search]            [Independent Evidence Search]         [Claim Proposition Extraction]
+(DDGS + Google Fact Check)                   │                                        │
+    │                                        │                                        │
+    └────────────────────────────────────────┼────────────────────────────────────────┘
+                                             │
+                                             ▼
+                                  [Source Quality Tiering]
+                          (Primary / Secondary / Low-Confidence)
+                                             │
+                                             ▼
+                                [Content Passage Extraction]
+                                (HTML Cleaning & Chunking)
+                                             │
+                                             ▼
+                                [BGE-M3 Semantic Ranking]
+                        (SentenceTransformers / HF API / Lexical)
+                                             │
+                                             ▼
+                                 [Evidence Quality Gate]
+                     (URL Validity, Length, Dedup, Tier Thresholds)
+                                             │
+                                             ▼
+                             [Grounded LLM Verification]
+                 (Llama 3.3 70B via HF Inference / Heuristic Fallback)
+                                             │
+                                             ▼
+                              [Provenance & Citation Validation]
+                              (ID Matching & Stance Consistency)
+                                             │
+                                             ▼
+                              [Verdict + Explanation + Evidence]
+                                             │
+                                             ▼
+                                 [Frontend Web Dashboard]
 ```
 
 ---
 
-## 📥 Input Modes
+## 📥 Supported Input Modes
 
 1. **Text Claim Mode**:
    - Accepts plain-text statements (e.g., *"NASA confirmed a new asteroid trajectory"*).
-   - Classifies claim type (`factual`, `medical_factual`, `subjective_opinion`), extracts targeted search queries, retrieves web search candidates and optional Google Fact Check API items, ranks evidence, and performs grounded verification.
+   - Classifies claim type (`factual`, `medical_factual`, `subjective_opinion`), formulates search queries, fetches web candidates and optional Google Fact Check API items, ranks evidence, and performs grounded verification.
 
 2. **URL Verification Mode**:
-   - **URL-Only**: Fetches a public webpage safely, extracts bounded key factual claims, independently verifies each claim across external sources, and aggregates an overall article-level verdict.
-   - **URL + Question**: Uses fetched webpage content as context to resolve contextual questions (e.g., *"Is this statement accurate?"*), then independently verifies the resolved claim while excluding the exact subject page from independent evidence to prevent circular proof.
+   - **URL-Only**: Fetches a public webpage safely, extracts bounded key factual claims, independently verifies each claim across external web sources, and aggregates an overall article-level verdict.
+   - **URL + Question**: Uses fetched webpage content as context to resolve contextual questions (e.g., *"Is this statement accurate?"*), then independently verifies the resolved claim while excluding the exact subject page from independent evidence to prevent circular self-proof.
 
 3. **Image OCR Mode**:
-   - Accepts uploaded images or base64 image payloads.
-   - Uses **RapidOCR** (with system `pytesseract` fallback) to extract readable text from screenshots, news clips, or document flyers.
+   - Accepts uploaded image files or base64 image payloads.
+   - Uses **RapidOCR** (`rapidocr-onnxruntime`) with system `pytesseract` fallback to extract visible text from screenshots, news clips, or document flyers.
    - Classifies question intent (`text_extraction`, `fact_check_verify`, `visual_question`, `specific_question`).
-   - Extracts verifiable claim propositions from image text and routes them through the evidence verification pipeline.
+   - Extracts verifiable claim propositions (`extract_ocr_claim_proposition`) from image text and routes them through the verification pipeline.
    - *Scope Note*: Image analysis focuses primarily on extracting and verifying factual text from images.
+
+4. **Speech-to-Text (STT) Mode**:
+   - Integrated directly in the frontend claim input interface (`frontend/src/components/ClaimInput.tsx`).
+   - Utilizes browser-native Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`) configured for English (`en-IN` default).
+   - Allows users to speak claims via microphone, transcribing spoken audio into the text area in real-time before submitting to the verification pipeline.
 
 ---
 
-## 🚦 Supported Verdict Types
+## 🚦 Verdicts & Terminology
 
-The system outputs a structured verdict from a non-binary 5-type vocabulary:
+The system outputs a structured verdict representing the verification outcome. 
 
-| Verdict | Symbol | Description |
-| :--- | :---: | :--- |
-| **Supported** | 🟢 | Direct, reliable evidence from primary or secondary sources explicitly corroborates the core claim proposition. |
-| **Contradicted** | 🔴 | Direct, reliable evidence explicitly refutes, disproves, or establishes facts incompatible with the claim. |
-| **Insufficient Evidence** | 🟡 | Available retrieved evidence is incomplete, ambiguous, or lacks explicit facts to confirm or refute the claim. |
-| **Conflicting Evidence** | 🟠 | High-credibility sources directly contradict one another or present conflicting empirical findings. |
-| **Subjective / Opinion** | 🔵 | The statement expresses a value judgment, qualitative framing, or opinion that is not objectively verifiable. |
+### Internal vs. User-Facing Verdict Vocabulary
 
-*Why "Insufficient Evidence" exists*: Not all claims have indexed or conclusive web documentation. When search retrieval produces no matching records or only low-confidence sources, the system explicitly returns `insufficient_evidence` rather than guessing or hallucinating a verdict.
+| Backend Enum Value (`AssessmentVerdict`) | User-Facing Display Label | Symbol | Description |
+| :--- | :--- | :---: | :--- |
+| `supported` | **Supported** | 🟢 | Direct, reliable evidence from primary or secondary sources explicitly corroborates the claim. |
+| `contradicted` | **Contradicted** | 🔴 | Direct, reliable evidence explicitly refutes, disproves, or establishes facts incompatible with the claim. |
+| `insufficient_evidence` | **No Official Evidence** | 🟡 | The system could not establish sufficient authoritative evidence to confirm or refute the claim. |
+| `conflicting_evidence` | **Conflicting Evidence** | 🟠 | High-credibility sources directly contradict one another or present conflicting empirical findings. |
+| `subjective_opinion` | **Subjective / Opinion** | 🔵 | The statement expresses a value judgment, qualitative framing, or opinion that is not objectively verifiable. |
+
+> **Important UX Distinction**: The backend schema uses `insufficient_evidence` internally, but the user interface renders **"No Official Evidence"** to clearly communicate to users that no decisive official reporting was found in indexed web sources.
 
 ---
 
 ## 🔬 Evidence & Source Quality Principles
 
-### Source Tiering
-Sources are categorized into three distinct authority tiers (`core/source_filter.py`):
+### Source Authority Tiering
+Domains are categorized into three explicit authority tiers (`core/source_filter.py`):
 
-- **PRIMARY** (Authority Weight: `1.0`): Official government domains (`.gov`, `.gov.in`, `.nic.in`, `.edu`, `.ac.in`), official registries (WHO, UN, CDC, FDA, NIH, NASA, RBI, ISRO), and legal repositories.
-- **SECONDARY** (Authority Weight: `0.85`): Established news agencies, wire services, and recognized fact-checking organizations (Reuters, AP, BBC, The Hindu, Bloomberg, Snopes, FactCheck.org, PolitiFact, etc.).
-- **LOW_CONFIDENCE** (Authority Weight: `0.4`): User-generated content platforms, social networks, forums, and unverified personal blogs (Reddit, Twitter/X, Facebook, Medium, Quora, Blogspot, etc.). Unknown domains default conservatively to LOW_CONFIDENCE.
+- **PRIMARY** (Authority Weight: `1.0`): Official government domains (`.gov`, `.gov.in`, `.nic.in`, `.edu`, `.ac.in`), official registries (WHO, UN, CDC, FDA, NIH, NASA, RBI, ISRO), and legal court repositories.
+- **SECONDARY** (Authority Weight: `0.85`): Established international news wire services, recognized journalism outlets, and established fact-checking organizations (Reuters, AP, BBC, The Hindu, Bloomberg, Snopes, FactCheck.org, PolitiFact, etc.).
+- **LOW_CONFIDENCE** (Authority Weight: `0.4`): User-generated content platforms, social networks, forums, and unverified personal blogs (Reddit, Twitter/X, Facebook, Medium, Quora, Blogspot, YouTube, etc.). Unknown or unclassified domains default conservatively to LOW_CONFIDENCE.
 
-*Role in Verification*: Source tiering adjusts passage similarity scores and enforces quality gates. A claim cannot be marked `supported` or `contradicted` based solely on low-confidence sources without primary or secondary corroboration.
+*Role in Verification*: Source authority weights scale passage similarity scores during ranking. Low-confidence sources alone cannot yield a `supported` or `contradicted` verdict without primary or secondary corroboration.
 
 ---
 
 ## 📊 BGE-M3 Semantic Ranking
 
-Semantic ranking uses `BAAI/bge-m3` embeddings (`core/ranker.py`):
+Semantic ranking evaluates candidate passages using `BAAI/bge-m3` embeddings (`core/ranker.py`):
 
-- **Purpose**: Measures topic and textual similarity (0.0 to 1.0) between the user claim and retrieved passages to select the top-K most relevant chunks for LLM verification.
-- **Distinct Metrics**:
-  - **Relevance Score (% Relevance)**: Indicates how topically close an evidence passage is to the claim assertion.
-  - **Confidence Score**: Indicates the verifier's confidence in the final verdict based on evidence authority, tier weighting, and source agreement. High relevance does not imply a claim is true.
+- **Embedding & Scoring**: Computes cosine similarity between the claim vector and passage vectors using Hugging Face Inference API or local `SentenceTransformer` models (with a lightweight lexical fallback if models are offline or in low-memory mode).
+- **Metric Distinction**:
+  - **Relevance Score (% Relevance)**: Measures textual and topical similarity (0.0 to 1.0) between the claim and an evidence passage.
+  - **Confidence Score**: Represents overall verdict certainty based on evidence authority, source agreement, and quality gate results.
+- **Crucial Boundary**: BGE-M3 semantic similarity measures topical closeness, **not** factual truth probability.
 
 ---
 
@@ -132,8 +160,8 @@ Semantic ranking uses `BAAI/bge-m3` embeddings (`core/ranker.py`):
 Candidate evidence items must pass conservative quality checks before LLM analysis (`core/evidence_gate.py`):
 
 - **URL Validity**: Rejects invalid, empty, or malformed URLs (`is_valid_url`).
-- **Minimum Word Count**: Rejects passages with fewer than 10 words.
-- **Duplicate Detection**: Filters near-duplicate passage texts across candidates.
+- **Minimum Passage Length**: Rejects snippets under 10 words.
+- **Duplicate Filtering**: Deduplicates identical passage text across candidate search hits.
 - **Tier-Dependent Relevance Thresholds**:
   - Primary sources: minimum relevance score `0.15`
   - Secondary sources: minimum relevance score `0.25`
@@ -141,55 +169,62 @@ Candidate evidence items must pass conservative quality checks before LLM analys
 
 ---
 
-## 🤖 LLM Verification
+## 🤖 LLM Verification & Fallback
 
 - **Configured Model**: `meta-llama/Llama-3.3-70B-Instruct` (via Hugging Face `InferenceClient`).
-- **Grounded Verification**: System prompts instruct the LLM to evaluate logical entailment (`supports`, `contradicts`, `neutral`) strictly against the retrieved passage text inside `Passage: "..."`. Domain names, URLs, and article titles are for provenance only and are not treated as factual proof.
-- **Heuristic Fallback**: If `HF_TOKEN` is unconfigured, rate-limited, or offline, the pipeline falls back to an intelligent semantic heuristic verifier (`analyze_with_heuristics`).
+- **Grounded Verification**: System prompts instruct the LLM to evaluate logical stance (`supports`, `contradicts`, `neutral`) strictly against text inside `Passage: "..."`. Domain names, URLs, and article titles serve provenance context only and are not treated as proof.
+- **Heuristic Fallback Mode**: If `HF_TOKEN` is unconfigured, offline, or rate-limited, the pipeline falls back to an intelligent semantic heuristic verifier (`analyze_with_heuristics`). This fallback evaluates term overlap, entity presence, refutation keywords, and source tier weights to provide a degraded offline verdict.
 
 ---
 
-## 🛡️ Provenance Validation
+## 🔍 Google Fact Check Integration
 
-The system enforces strict runtime provenance tracking (`_validate_llm_provenance`):
-
-- LLM evidence references (e.g., `ev_1`, `ev_2`) are matched against actual retrieved `EvidenceItem` objects by exact ID, index, or URL.
-- Raw LLM JSON outputs are **never** allowed to instantiate new or synthetic evidence items.
-- Unmappable or hallucinated citation IDs are rejected and recorded under `evidence_limitations`.
-
----
-
-## 🌐 URL Verification & Safety
-
-- **Modes**: URL-only claim extraction & URL + Question contextual analysis (`core/url_pipeline.py`).
-- **Safe Page Fetching**: Uses `httpx` and `BeautifulSoup4` to extract titles, canonical URLs, publication dates, authors, and main article text (`core/url_fetcher.py`).
-- **SSRF Protections**: `is_safe_public_url` validates URLs and blocks requests to loopback addresses, local network IPs (`127.0.0.1`, `localhost`, RFC1918 private subnets), link-local addresses, and DNS hostnames resolving to private IPs.
-- **Subject-Page Isolation**: When verifying a URL, the exact subject page URL and its canonical equivalent are excluded from independent evidence retrieval (`is_subject_page_url`) to avoid circular self-referential proof.
+When `GOOGLE_FACT_CHECK_API_KEY` is configured in `.env`:
+- Queries the Google Fact Check Tools API (`claims:search`) for published fact-checks from 100+ organizations (Snopes, Reuters, PolitiFact, AFP, etc.).
+- Converts matching fact-check items into candidate evidence passages and injects them into the ranking pipeline.
+- *Architectural Distinction*: Third-party fact-check metadata serves as an additional reference signal. If web retrieval returns insufficient evidence but publisher reviews show clear consensus, the system uses publisher consensus to inform the verdict.
 
 ---
 
-## 🖼️ Image Verification & OCR
+## 🌐 URL Verification & Security
+
+- **Safe Web Fetching**: Fetches public webpages via `httpx` with timeout controls and extracts metadata (`og:title`, `<title>`, canonical URL, publication date, author) and cleaned text via BeautifulSoup4 (`core/url_fetcher.py`).
+- **SSRF Protection**: `is_safe_public_url` validates hostnames and blocks requests targeting localhost, private subnets (`10.x`, `172.16-31.x`, `192.168.x`), loopback addresses (`127.0.0.1`, `::1`), link-local IPs, or DNS entries resolving to private IPs.
+- **Subject-Page Isolation**: When analyzing a user-supplied URL, that exact page and its canonical URL are excluded from independent evidence search (`is_subject_page_url`) so the page cannot act as circular proof for its own claims.
+
+---
+
+## 🖼️ Image & OCR Pipeline
 
 - **OCR Engine**: Uses **RapidOCR** (`rapidocr-onnxruntime`) as primary engine, with system `pytesseract` as fallback (`core/image_ocr.py`).
-- **Preprocessing & Cleaning**: Image upscaling, RGB normalization, autocontrast, and header/footer noise removal (`clean_extracted_ocr_text`).
-- **Question Intent Routing**:
+- **Preprocessing**: Image upscaling (if under 600x300), RGB conversion, autocontrast, and header/footer UI noise removal (`clean_extracted_ocr_text`).
+- **Intent Routing**:
   - `text_extraction`: Returns raw extracted OCR text.
-  - `fact_check_verify`: Extracts core factual claim proposition (`extract_ocr_claim_proposition`) and executes verification.
-  - `visual_question`: Uses multimodal vision model if configured (`HF_VISION_MODEL`), or returns an explicit limitation explaining that visual spatial reasoning is unconfigured.
+  - `fact_check_verify`: Extracts verifiable claim propositions (`extract_ocr_claim_proposition`) and executes full verification.
+  - `visual_question`: Calls multimodal vision endpoint if `HF_VISION_MODEL` is configured, or returns an explicit limitation noting that visual spatial reasoning is unconfigured.
   - `specific_question`: Verifies the resolved claim or question against web evidence.
-- **Boundary**: Image verification focuses on extracting and verifying factual text claims from image media.
+
+---
+
+## 🎤 Speech-to-Text (STT)
+
+- **Frontend Component**: Implemented in `frontend/src/components/ClaimInput.tsx`.
+- **Engine**: Browser-native Web Speech API (`SpeechRecognition` / `webkitSpeechRecognition`).
+- **Interface**: Microphone icon button (`<Mic />`) embedded in the main claim input box.
+- **Behavior**: Listens to user voice input in real-time, converts speech to text, updates the input area, and enables one-click submission to the verification pipeline.
+- **Browser Requirements**: Requires browser Web Speech API support (Google Chrome, Microsoft Edge, Safari) and user microphone permissions.
 
 ---
 
 ## 🔌 API Reference
 
-The FastAPI backend (`api/main.py`) provides the following endpoints:
+FastAPI backend endpoints (`api/main.py`):
 
 ### `GET /`
-Returns basic API status and links to interactive documentation (`/docs`).
+Returns API running status and OpenAPI documentation URL (`/docs`).
 
 ### `GET /api/health`
-Returns health status, HF token configuration status, and active LLM/embedding model names:
+Returns system operational status, HF token configuration state, and configured model identifiers:
 ```json
 {
   "status": "healthy",
@@ -200,118 +235,85 @@ Returns health status, HF token configuration status, and active LLM/embedding m
 ```
 
 ### `POST /api/analyze`
-Main verification endpoint accepting JSON payloads for claims, URLs, or base64 images.
+Main analysis endpoint accepting JSON payloads for claims, URLs, or base64 images.
 
-**Request Payload Examples**:
-
-*Text Claim*:
+**Request Schema Placeholder**:
 ```json
 {
-  "claim": "NASA confirmed a new asteroid trajectory in 2026."
+  "claim": "<textual claim or URL string>",
+  "image_base64": "<optional base64 image string>",
+  "image_filename": "<optional image filename>",
+  "question": "<optional question about claim or image>"
 }
 ```
 
-*Image Payload*:
+**Response Schema Structure (`AnalysisResult`)**:
 ```json
 {
-  "image_base64": "data:image/png;base64,iVBORw0KGgo...",
-  "image_filename": "flyer.png",
-  "question": "Is this claim real?"
-}
-```
-
-**Response Payload Structure (`AnalysisResult`)**:
-```json
-{
-  "claim": "NASA confirmed a new asteroid trajectory in 2026.",
-  "claim_type": "factual",
-  "verdict": "supported",
-  "verdict_symbol": "🟢",
-  "verdict_title": "Supported",
-  "confidence_score": 0.88,
-  "explanation": "Yes, NASA confirmed a new asteroid trajectory. Verified reports and empirical documentation from nasa.gov explicitly confirm the stated event.",
+  "claim": "<analyzed claim proposition>",
+  "claim_type": "factual | medical_factual | subjective_opinion",
+  "verdict": "supported | contradicted | insufficient_evidence | conflicting_evidence | subjective_opinion",
+  "verdict_symbol": "🟢 | 🔴 | 🟡 | 🟠 | 🔵",
+  "verdict_title": "<verdict title string>",
+  "confidence_score": 0.0,
+  "explanation": "<detailed evidence-grounded breakdown>",
   "supporting_evidence": [
     {
       "id": "ev_1",
-      "url": "https://www.nasa.gov/news/asteroid-trajectory-2026",
-      "title": "NASA Asteroid Trajectory Update",
-      "domain": "nasa.gov",
-      "source_tier": "primary",
-      "passage": "NASA Climate Monitoring and Planetary Defense teams published confirmed trajectory observations...",
-      "similarity_score": 0.84,
+      "url": "<evidence URL>",
+      "title": "<article title>",
+      "domain": "<source domain>",
+      "source_tier": "primary | secondary | low_confidence",
+      "passage": "<extracted evidence snippet>",
+      "similarity_score": 0.85,
       "stance": "supports",
-      "stance_explanation": "Authoritative primary report explicitly corroborates the trajectory observation."
+      "stance_explanation": "<reasoning for support>"
     }
   ],
   "contradicting_evidence": [],
-  "evidence_limitations": [],
+  "evidence_limitations": ["<limitation or gap in evidence>"],
   "all_sources": [
     {
-      "url": "https://www.nasa.gov/news/asteroid-trajectory-2026",
-      "domain": "nasa.gov",
-      "title": "NASA Asteroid Trajectory Update",
+      "url": "<source URL>",
+      "domain": "<domain>",
+      "title": "<title>",
       "tier": "primary",
-      "tier_reason": "Official Source: Official government authority, academic publication, or recognized legal repository."
+      "tier_reason": "<tier classification explanation>"
     }
   ],
-  "relevant_images": [],
-  "latency_seconds": 3.42,
-  "mode": "claim",
-  "targeted_answer": "Yes, NASA confirmed a new asteroid trajectory."
+  "latency_seconds": 2.45,
+  "mode": "claim | url | url_question | image",
+  "targeted_answer": "<direct answer statement>"
 }
 ```
 
 ### `POST /api/analyze-image`
-Multipart form-data endpoint for direct image file uploads.
+Multipart form-data upload endpoint for image analysis.
 
 **Parameters**:
-- `file`: Uploaded image file (`multipart/form-data`)
-- `question` (optional): User question string
-
----
-
-## 🖥️ Frontend Overview
-
-Built with **React 19**, **TypeScript**, and **Vite**:
-
-- **Landing Page** (`LandingPage.tsx`): Pinterest-style editorial visual presentation across 5 core sections:
-  1. Hero / Why (Masthead typography & overlapping visual collage)
-  2. Evidence Engine (Layered asymmetric evidence board)
-  3. Quote Stage (3D stacked magazine carousel with WHO & UN quotes)
-  4. Analyzer Showcase (Interactive product interface frame)
-  5. Multimodal & Traceability (Media collage: Image OCR, Document, URL, Traceability chain)
-  6. Final CTA (Poster-like closing frame)
-- **Analyzer Application** (`/analyzer` route):
-  - Tabbed input controls for Text Claim, Web URL, and Image Upload.
-  - Interactive pipeline step execution indicators.
-  - Result card displaying verdict symbols, confidence badges, direct answers, and AI summaries.
-  - Evidence cards with relevance scores, source tier tags, and expandable quotes.
-  - All Sources drawer & image preview thumbnails.
-  - Left sidebar with architectural principles & recent analysis history.
+- `file`: Image file payload (`multipart/form-data`)
+- `question`: Optional question string (`Form`)
 
 ---
 
 ## ⚙️ Configuration
 
-Settings are managed via environment variables (`core/config.py` & `.env.example`).
+Managed via environment variables (`core/config.py` and `.env.example`).
 
-### Required / Core Settings
-- `HF_TOKEN`: Hugging Face User Access Token (required for Hugging Face LLM and BGE-M3 API calls).
+### Configuration Variables Matrix
 
-### Optional API Integration
-- `GOOGLE_FACT_CHECK_API_KEY`: API key for Google Fact Check Tools API (free, 1000 req/day).
-
-### Model Configuration
-- `HF_LLM_MODEL`: Hugging Face LLM model identifier (default: `meta-llama/Llama-3.3-70B-Instruct`).
-- `HF_EMBEDDING_MODEL`: Embedding model identifier (default: `BAAI/bge-m3`).
-
-### Pipeline & Performance Settings
-- `MAX_SEARCH_RESULTS`: Max web search candidates to retrieve per claim (default: `5`).
-- `TOP_K_EVIDENCE`: Max evidence chunks to select for LLM verification (default: `4`).
-- `HTTP_TIMEOUT`: Web fetch timeout in seconds (default: `6.0`).
-- `LOW_MEMORY_MODE`: Set to `true` to optimize memory usage (default: `true`).
-- `ALLOW_MOCK_FALLBACK`: Enables heuristic fallback mode when `HF_TOKEN` is unconfigured or rate-limited (default: `true`).
-- `ALLOWED_ORIGINS`: Comma-separated CORS origins for frontend access (default: `https://hack-xi-red.vercel.app,http://localhost:5173,http://127.0.0.1:5173`).
+| Variable | Source Code Default | `.env.example` Value | Description |
+| :--- | :--- | :--- | :--- |
+| `HF_TOKEN` | `""` | `your_huggingface_token_here` | Hugging Face Access Token for LLM & embedding Inference API. |
+| `GOOGLE_FACT_CHECK_API_KEY` | `""` | `your_google_api_key_here` | Optional API key for Google Fact Check Tools API. |
+| `HF_LLM_MODEL` | `meta-llama/Llama-3.3-70B-Instruct` | `meta-llama/Llama-3.3-70B-Instruct` | Hugging Face model identifier for verification. |
+| `HF_EMBEDDING_MODEL` | `BAAI/bge-m3` | `BAAI/bge-m3` | Embedding model identifier for BGE-M3 ranking. |
+| `MAX_SEARCH_RESULTS` | `5` | `5` | Maximum web search candidates retrieved per claim. |
+| `TOP_K_EVIDENCE` | `4` | `4` | Maximum evidence chunks selected for LLM verification. |
+| `HTTP_TIMEOUT` | `6.0` | `6.0` | HTTP request timeout in seconds for web fetching. |
+| `LOW_MEMORY_MODE` | `true` | `true` | Optimizes memory usage by disabling heavy local model loads. |
+| `ALLOW_MOCK_FALLBACK` | `true` | `true` | Enables heuristic fallback mode when `HF_TOKEN` is absent or rate-limited. |
+| `ALLOWED_ORIGINS` | `""` | `https://hack-xi-red.vercel.app,http://localhost:5173,http://127.0.0.1:5173` | Allowed CORS origins for FastAPI middleware. |
 
 ---
 
@@ -321,10 +323,10 @@ Settings are managed via environment variables (`core/config.py` & `.env.example
 - Python 3.10+
 - Node.js 18+ and npm
 
-### 1. Repository Setup & Environment
+### 1. Clone & Virtual Environment
 ```bash
-git clone https://github.com/SOHAN-AI/hackathon.git
-cd hackathon
+git clone https://github.com/educational454-ai/hack.git
+cd hack
 
 # Create and activate virtual environment
 python -m venv venv
@@ -338,26 +340,25 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env
 ```
-Edit `.env` and set your credentials:
+Edit `.env` to set your credentials:
 ```env
 HF_TOKEN=your_huggingface_token_here
 GOOGLE_FACT_CHECK_API_KEY=your_google_api_key_here
 ```
 
-### 3. Run Backend Server
+### 3. Start Backend Server
 ```bash
 python run_server.py
 ```
-The FastAPI backend server will run at `http://127.0.0.1:8000`. Interactive OpenAPI documentation is accessible at `http://127.0.0.1:8000/docs`.
+The FastAPI backend server runs at `http://127.0.0.1:8000`. OpenAPI docs are available at `http://127.0.0.1:8000/docs`.
 
-### 4. Run CLI Interface (Optional)
-To test verification directly in your terminal:
+### 4. CLI Analyzer (Optional Terminal Testing)
 ```bash
-python cli.py "Is India a member of the United Nations Security Council permanent five?"
+python cli.py "Is India a member of the UN Security Council permanent five?"
 ```
 
-### 5. Run Frontend Development Server
-In a new terminal window:
+### 5. Start Frontend Application
+In a separate terminal:
 ```bash
 cd frontend
 npm install
@@ -367,82 +368,82 @@ Open `http://localhost:5173` in your browser.
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing & CI
 
-### Backend Test Suite
-Run the backend unit test suite:
+### Run Backend Unit Tests
+Execute the backend unit test suite:
 ```bash
 python -m unittest discover -s tests
 ```
 
-### Frontend Build Validation
-Compile TypeScript and build the production bundle:
+### Run Frontend Build
+Validate TypeScript compilation and Vite production build:
 ```bash
 cd frontend
 npm run build
 ```
 
----
-
-## 🔄 CI
-
-Automated continuous integration is configured via GitHub Actions (`.github/workflows/ci.yml`):
-- **backend-test**: Sets up Python 3.12, installs `requirements.txt`, and executes `unittest discover -s tests`.
-- **frontend-build**: Sets up Node.js 20, installs dependencies (`npm ci`), and verifies production build (`npm run build`).
-
----
-
-## ⚠️ Limitations
-
-- **Search Availability**: Web retrieval depends on DuckDuckGo Search availability and network reachability.
-- **LLM API Quotas**: Serverless Hugging Face Inference API calls require an active `HF_TOKEN` and depend on model endpoint availability.
-- **Source Indexing**: The system cannot verify claims if relevant authoritative primary or secondary web sources are unindexed or unavailable.
-- **OCR Text Focus**: Image verification relies on OCR text extraction (screenshots, flyers, clips) rather than unrestricted visual scene understanding.
-
----
-
-## 💡 Hackathon Demo Usage
-
-Example claims to test in the Analyzer interface:
-
-1. **Factual Claim**: *"The Earth orbits the Sun."*
-   - Expected Output: `Supported` (🟢) with primary/secondary scientific evidence citations.
-2. **False / Contradicted Claim**: *"The Sun orbits the Earth."*
-   - Expected Output: `Contradicted` (🔴) with evidence refuting geocentrism.
-3. **Subjective Claim**: *"Mumbai is the best city in India."*
-   - Expected Output: `Subjective / Opinion` (🔵) explaining qualitative value judgment framing.
-4. **Image OCR Verification**:
-   - Upload a document flyer or news screenshot containing text to extract and verify factual statements.
+### Continuous Integration (CI)
+GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs on main pushes and pull requests:
+- **backend-test**: Sets up Python 3.12, installs dependencies, and runs `python -m unittest discover -s tests`.
+- **frontend-build**: Sets up Node.js 20, installs npm dependencies, and runs `npm run build`.
 
 ---
 
 ## 🔐 Security & Trust Boundaries
 
-- **Runtime Web Search**: No hardcoded evidence; candidates are gathered live per request.
-- **Provenanced Citations**: Model output citations are validated against retrieved evidence IDs before rendering.
-- **SSRF Defense**: Restricts webpage fetching from targeting private, loopback, or local IP networks.
-- **Environment Isolation**: API tokens are loaded from `.env` and excluded from frontend client responses.
+- **Untrusted Web Inputs**: All external web HTML content and extracted text are sanitized and cleaned before parsing.
+- **SSRF Defense**: `is_safe_public_url` validates URLs against localhost, private IP subnets (`10.x`, `172.16-31.x`, `192.168.x`), loopback addresses (`127.0.0.1`, `::1`), and private DNS resolutions.
+- **Citation Provenance Validation**: `_validate_llm_provenance` checks model citation references against retrieved evidence IDs, rejecting hallucinated IDs.
+- **Environment Isolation**: API secrets (`HF_TOKEN`, `GOOGLE_FACT_CHECK_API_KEY`) are managed via `.env` and never exposed in client responses.
+
+---
+
+## ⚠️ System Boundaries & Limitations
+
+- **Web Search Dependency**: Web retrieval quality depends on live DuckDuckGo Search reachability and public web indexing.
+- **LLM Rate Limits & Quotas**: Serverless Hugging Face Inference API calls require an active `HF_TOKEN` and depend on model server availability.
+- **Heuristic Fallback Trade-off**: The heuristic fallback mode is an offline degraded mode and is less nuanced than the primary Llama 3.3 70B verifier.
+- **OCR Quality**: Text extraction from images depends on image resolution, contrast, and layout clarity.
+- **Speech Recognition Browser Constraints**: Speech-to-text relies on browser Web Speech API support (Chrome, Edge, Safari) and requires microphone permissions.
+- **Semantic Relevance vs. Truth**: BGE-M3 embedding similarity measures topical closeness, not factual accuracy.
+
+---
+
+## 💡 Hackathon Demo Walkthrough
+
+A practical 4-step demonstration flow:
+
+1. **Text Claim Verification**:
+   - Enter a factual claim (e.g., *"The Earth orbits the Sun"*).
+   - Observe live web search, domain authority tiering, evidence passage ranking, and grounded verdict output.
+2. **URL Verification**:
+   - Paste an article URL to extract key factual claims and run independent verification with subject page isolation.
+3. **Image OCR Verification**:
+   - Upload a flyer image or news clip screenshot to extract readable text claims and verify them against web evidence.
+4. **Speech-to-Text Voice Input**:
+   - Click the microphone icon (`<Mic />`) in the claim input box, speak a claim aloud, and watch it transcribe in real-time before analyzing.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-hackathon/
+hack/
 ├── .env.example              # Template for environment configuration
 ├── requirements.txt          # Backend Python dependencies
-├── run_server.py             # Server startup script for FastAPI
-├── cli.py                    # Terminal CLI analyzer script
+├── run_server.py             # FastAPI backend launcher
+├── cli.py                    # Terminal CLI analyzer tool
 ├── api/
 │   ├── __init__.py
-│   └── main.py               # FastAPI routes (/api/health, /api/analyze, /api/analyze-image)
+│   └── main.py               # FastAPI endpoint handlers (/api/health, /api/analyze, /api/analyze-image)
 ├── core/
 │   ├── __init__.py
 │   ├── config.py             # Configuration dataclass & env loader
 │   ├── schemas.py            # Pydantic data contracts (AnalysisResult, EvidenceItem, etc.)
-│   ├── claim_parser.py       # Claim classification & search query formulation
-│   ├── retriever.py          # DDGS text & image search retrieval
-│   ├── source_filter.py      # Domain tiering (Primary, Secondary, Low Confidence)
+│   ├── claim_parser.py       # Claim classification & query formulation
+│   ├── retriever.py          # DDGS text & image retrieval
+│   ├── source_filter.py      # Domain tiering (Primary, Secondary, Low-Confidence)
 │   ├── extractor.py          # HTML cleaning, passage chunking & parallel web fetching
 │   ├── ranker.py             # BGE-M3 semantic similarity scoring & image ranking
 │   ├── evidence_gate.py      # Evidence Quality Gate filtering
@@ -454,24 +455,27 @@ hackathon/
 │   ├── url_pipeline.py       # URL & URL+Question mode handlers
 │   ├── image_ocr.py          # RapidOCR & pytesseract text extraction engine
 │   └── image_pipeline.py     # Multimodal image verification pipeline
-├── frontend/                 # React 19 + TypeScript + Vite web app
+├── frontend/                 # React 19 + TypeScript + Vite web application
 │   ├── src/
-│   │   ├── components/       # UI components & LandingPage
+│   │   ├── components/       # ClaimInput, ResultCard, LeftSidebar, RightSidebar, LandingPage
 │   │   ├── types.ts          # TypeScript interfaces
 │   │   ├── api.ts            # Frontend API client
-│   │   ├── App.tsx           # Main application router/layout
-│   │   └── index.css         # Styling design system
+│   │   ├── App.tsx           # Main application layout & router
+│   │   └── index.css         # Design system & styles
 │   ├── package.json
 │   └── vite.config.ts
-└── tests/                    # Backend unit test suite
-    ├── test_api.py
-    ├── test_evidence_gate.py
-    ├── test_image_input.py
-    ├── test_image_relevance.py
-    ├── test_parser.py
-    ├── test_pipeline.py
-    ├── test_relevance_and_caveats.py
-    ├── test_source_filter.py
-    ├── test_url_verification.py
-    └── test_verifier.py
+├── tests/                    # Backend unit test suite (134 tests)
+│   ├── test_api.py
+│   ├── test_evidence_gate.py
+│   ├── test_image_input.py
+│   ├── test_image_relevance.py
+│   ├── test_parser.py
+│   ├── test_pipeline.py
+│   ├── test_relevance_and_caveats.py
+│   ├── test_source_filter.py
+│   ├── test_url_verification.py
+│   └── test_verifier.py
+└── .github/
+    └── workflows/
+        └── ci.yml            # GitHub Actions CI workflow
 ```
