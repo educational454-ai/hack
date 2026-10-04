@@ -28,7 +28,7 @@ TruthGuard AI enforces strict **evidence grounding**. Rather than letting an LLM
 - **Authoritative Source Tiering**: Classifies domains into Primary (government/academic), Secondary (reputable news/fact-checkers), and Low-Confidence (social media/blogs) tiers.
 - **BGE-M3 Semantic Ranking**: Scores passage relevance using vector embeddings, clearly separating topical relevance from truth probability.
 - **Evidence Quality Gate**: Filters out malformed URLs, short snippets, duplicates, and low-relevance passages before LLM verification.
-- **Grounded LLM Verification & Heuristic Fallback**: Evaluates claim stance using Llama 3.3 70B, with an intelligent heuristic fallback mode if API tokens are unconfigured or rate-limited.
+- **Grounded LLM Verification & Heuristic Fallback**: Evaluates claim stance using Llama 3.3 70B, with a degraded heuristic fallback mode if API tokens are unconfigured or rate-limited.
 - **Strict Provenance Validation**: Rejects unmappable or hallucinated model evidence references.
 - **Transparent Output**: Returns non-binary verdicts, confidence scores, semantic relevance percentages, direct answers, evidence passages, source lists, and explicit limitations.
 
@@ -139,7 +139,7 @@ Domains are categorized into three explicit authority tiers (`core/source_filter
 - **SECONDARY** (Authority Weight: `0.85`): Established international news wire services, recognized journalism outlets, and established fact-checking organizations (Reuters, AP, BBC, The Hindu, Bloomberg, Snopes, FactCheck.org, PolitiFact, etc.).
 - **LOW_CONFIDENCE** (Authority Weight: `0.4`): User-generated content platforms, social networks, forums, and unverified personal blogs (Reddit, Twitter/X, Facebook, Medium, Quora, Blogspot, YouTube, etc.). Unknown or unclassified domains default conservatively to LOW_CONFIDENCE.
 
-*Role in Verification*: Source authority weights scale passage similarity scores during ranking. Low-confidence sources alone cannot yield a `supported` or `contradicted` verdict without primary or secondary corroboration.
+*Role in Verification*: Source authority weights scale passage similarity scores during ranking. Low-confidence sources receive stricter relevance thresholds and should not serve as the sole basis for strong factual conclusions.
 
 ---
 
@@ -149,9 +149,9 @@ Semantic ranking evaluates candidate passages using `BAAI/bge-m3` embeddings (`c
 
 - **Embedding & Scoring**: Computes cosine similarity between the claim vector and passage vectors using Hugging Face Inference API or local `SentenceTransformer` models (with a lightweight lexical fallback if models are offline or in low-memory mode).
 - **Metric Distinction**:
-  - **Relevance Score (% Relevance)**: Measures textual and topical similarity (0.0 to 1.0) between the claim and an evidence passage.
-  - **Confidence Score**: Represents overall verdict certainty based on evidence authority, source agreement, and quality gate results.
-- **Crucial Boundary**: BGE-M3 semantic similarity measures topical closeness, **not** factual truth probability.
+  - **Relevance Score (% Relevance)**: Measures textual and topical similarity between the claim and an evidence passage.
+  - **Confidence Score**: Verification confidence is an internal confidence signal associated with the generated assessment and should not be interpreted as a calibrated probability that the claim is true.
+- **Crucial Boundary**: BGE-M3 semantic similarity measures how relevant/semantically related retrieved evidence is to the claim; it is not a truth probability.
 
 ---
 
@@ -173,16 +173,19 @@ Candidate evidence items must pass conservative quality checks before LLM analys
 
 - **Configured Model**: `meta-llama/Llama-3.3-70B-Instruct` (via Hugging Face `InferenceClient`).
 - **Grounded Verification**: System prompts instruct the LLM to evaluate logical stance (`supports`, `contradicts`, `neutral`) strictly against text inside `Passage: "..."`. Domain names, URLs, and article titles serve provenance context only and are not treated as proof.
-- **Heuristic Fallback Mode**: If `HF_TOKEN` is unconfigured, offline, or rate-limited, the pipeline falls back to an intelligent semantic heuristic verifier (`analyze_with_heuristics`). This fallback evaluates term overlap, entity presence, refutation keywords, and source tier weights to provide a degraded offline verdict.
+- **Heuristic Fallback Mode**: If Hugging Face verification is unavailable, the pipeline can fall back to the implemented heuristic verifier (`analyze_with_heuristics`). This is a degraded mode and is less nuanced and reliable than the primary LLM verification path.
 
 ---
 
 ## 🔍 Google Fact Check Integration
 
-When `GOOGLE_FACT_CHECK_API_KEY` is configured in `.env`:
-- Queries the Google Fact Check Tools API (`claims:search`) for published fact-checks from 100+ organizations (Snopes, Reuters, PolitiFact, AFP, etc.).
-- Converts matching fact-check items into candidate evidence passages and injects them into the ranking pipeline.
-- *Architectural Distinction*: Third-party fact-check metadata serves as an additional reference signal. If web retrieval returns insufficient evidence but publisher reviews show clear consensus, the system uses publisher consensus to inform the verdict.
+When `GOOGLE_FACT_CHECK_API_KEY` is configured, the system can query the Google Fact Check Tools API for published fact-check reviews matching the claim.
+
+Returned reviews can include the reviewed claim, publisher, rating, review URL, and normalized verdict signal.
+
+These reviews are incorporated as an additional fact-check signal. A fact-check result should not be interpreted as automatic proof of the user's claim because the reviewed claim may differ in wording, scope, date, or context.
+
+The integration is optional and does not replace independent web evidence retrieval.
 
 ---
 
@@ -255,19 +258,19 @@ Main analysis endpoint accepting JSON payloads for claims, URLs, or base64 image
   "verdict": "supported | contradicted | insufficient_evidence | conflicting_evidence | subjective_opinion",
   "verdict_symbol": "🟢 | 🔴 | 🟡 | 🟠 | 🔵",
   "verdict_title": "<verdict title string>",
-  "confidence_score": 0.0,
+  "confidence_score": "<runtime value>",
   "explanation": "<detailed evidence-grounded breakdown>",
   "supporting_evidence": [
     {
-      "id": "ev_1",
+      "id": "<evidence ID>",
       "url": "<evidence URL>",
       "title": "<article title>",
       "domain": "<source domain>",
       "source_tier": "primary | secondary | low_confidence",
       "passage": "<extracted evidence snippet>",
-      "similarity_score": 0.85,
-      "stance": "supports",
-      "stance_explanation": "<reasoning for support>"
+      "similarity_score": "<runtime value>",
+      "stance": "supports | contradicts | neutral",
+      "stance_explanation": "<reasoning for stance>"
     }
   ],
   "contradicting_evidence": [],
@@ -277,11 +280,11 @@ Main analysis endpoint accepting JSON payloads for claims, URLs, or base64 image
       "url": "<source URL>",
       "domain": "<domain>",
       "title": "<title>",
-      "tier": "primary",
+      "tier": "primary | secondary | low_confidence",
       "tier_reason": "<tier classification explanation>"
     }
   ],
-  "latency_seconds": 2.45,
+  "latency_seconds": "<runtime value>",
   "mode": "claim | url | url_question | image",
   "targeted_answer": "<direct answer statement>"
 }
@@ -309,7 +312,7 @@ Managed via environment variables (`core/config.py` and `.env.example`).
 | `HF_LLM_MODEL` | `meta-llama/Llama-3.3-70B-Instruct` | `meta-llama/Llama-3.3-70B-Instruct` | Hugging Face model identifier for verification. |
 | `HF_EMBEDDING_MODEL` | `BAAI/bge-m3` | `BAAI/bge-m3` | Embedding model identifier for BGE-M3 ranking. |
 | `MAX_SEARCH_RESULTS` | `5` | `5` | Maximum web search candidates retrieved per claim. |
-| `TOP_K_EVIDENCE` | `4` | `4` | Maximum evidence chunks selected for LLM verification. |
+| `TOP_K_EVIDENCE` | `6` | `4` | Maximum evidence chunks selected for LLM verification; `.env.example` explicitly overrides the code default to 4. |
 | `HTTP_TIMEOUT` | `6.0` | `6.0` | HTTP request timeout in seconds for web fetching. |
 | `LOW_MEMORY_MODE` | `true` | `true` | Optimizes memory usage by disabling heavy local model loads. |
 | `ALLOW_MOCK_FALLBACK` | `true` | `true` | Enables heuristic fallback mode when `HF_TOKEN` is absent or rate-limited. |
@@ -403,7 +406,7 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) automatically runs on main 
 
 - **Web Search Dependency**: Web retrieval quality depends on live DuckDuckGo Search reachability and public web indexing.
 - **LLM Rate Limits & Quotas**: Serverless Hugging Face Inference API calls require an active `HF_TOKEN` and depend on model server availability.
-- **Heuristic Fallback Trade-off**: The heuristic fallback mode is an offline degraded mode and is less nuanced than the primary Llama 3.3 70B verifier.
+- **Heuristic Fallback Trade-off**: The heuristic fallback mode is an offline degraded mode and is less nuanced and reliable than the primary Llama 3.3 70B verification path.
 - **OCR Quality**: Text extraction from images depends on image resolution, contrast, and layout clarity.
 - **Speech Recognition Browser Constraints**: Speech-to-text relies on browser Web Speech API support (Chrome, Edge, Safari) and requires microphone permissions.
 - **Semantic Relevance vs. Truth**: BGE-M3 embedding similarity measures topical closeness, not factual accuracy.
@@ -464,7 +467,7 @@ hack/
 │   │   └── index.css         # Design system & styles
 │   ├── package.json
 │   └── vite.config.ts
-├── tests/                    # Backend unit test suite (134 tests)
+├── tests/                    # Backend unit test suite
 │   ├── test_api.py
 │   ├── test_evidence_gate.py
 │   ├── test_image_input.py
