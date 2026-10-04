@@ -76,6 +76,7 @@ class ParsedClaim(BaseModel):
     is_verifiable: bool
     perspectives: Optional[List[str]] = None
     extracted_queries: List[str] = Field(default_factory=list)
+    english_text: Optional[str] = None
 
 
 class RelevantImage(BaseModel):

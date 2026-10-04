@@ -1,6 +1,7 @@
 """Web retrieval module for candidate evidence gathering."""
 
 import logging
+import time
 from typing import List, Dict, Any
 from .config import config
 
@@ -29,13 +30,12 @@ def retrieve_search_candidates(queries: List[str], max_results: int = 8) -> List
             logger.error(f"Failed to load DDGS: {e2}")
             ddgs_client = None
 
+    target_max = max(max_results, 10)
     if ddgs_client:
         for q in queries:
-            if len(candidate_results) >= max_results:
-                break
             try:
-                # Retrieve text results
-                results = list(ddgs_client.text(q, max_results=5))
+                # Retrieve top 3-4 results per query to ensure diversity across general, government, and fact-check sources
+                results = list(ddgs_client.text(q, max_results=4))
                 for item in results:
                     url = item.get("href") or item.get("url") or item.get("link")
                     if not url or url in seen_urls:
@@ -46,10 +46,15 @@ def retrieve_search_candidates(queries: List[str], max_results: int = 8) -> List
                         "title": item.get("title", ""),
                         "body": item.get("body", "") or item.get("snippet", ""),
                     })
-                    if len(candidate_results) >= max_results:
+                    if len(candidate_results) >= target_max:
                         break
             except Exception as ex:
                 logger.warning(f"DDGS query failed for '{q}': {ex}")
+
+            time.sleep(0.35)
+
+            if len(candidate_results) >= target_max:
+                break
 
     # If no search candidates retrieved, return empty candidate list
     if not candidate_results:

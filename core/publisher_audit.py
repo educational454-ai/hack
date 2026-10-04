@@ -1,4 +1,4 @@
-﻿"""Publisher Transparency and Historical Audit Module.
+"""Publisher Transparency and Historical Audit Module.
 
 Queries Schema.org ClaimReview databases via Google Fact Check Tools API
 to empirically assess a publisher/news domain's historical record:
@@ -39,6 +39,43 @@ def clean_domain_name(domain_or_url: str) -> str:
     if d.startswith("www."):
         d = d[4:]
     return d.split(":")[0].strip()
+
+
+def shorten_debunk_rating(raw_rating: str) -> str:
+    """Extracts a concise, punchy debunk rating label."""
+    if not raw_rating:
+        return "Debunked"
+    r = raw_rating.strip()
+    r_lower = r.lower()
+
+    if "fake" in r_lower:
+        return "Fake"
+    if "false" in r_lower:
+        return "False"
+    if "misleading" in r_lower:
+        return "Misleading"
+    if "baseless" in r_lower:
+        return "Baseless"
+    if "altered" in r_lower:
+        return "Altered"
+    if "satire" in r_lower:
+        return "Satire"
+    if "ai" in r_lower and ("generated" in r_lower or "labeled" in r_lower):
+        return "AI Generated"
+    if "no such report" in r_lower:
+        return "No Such Report"
+    if "missing context" in r_lower:
+        return "Missing Context"
+    if "unverified" in r_lower or "unproven" in r_lower:
+        return "Unverified"
+    if "true" in r_lower or "correct" in r_lower or "verified" in r_lower:
+        return "Verified"
+
+    if len(r) <= 22 and not any(punct in r for punct in [".", ";", "\n"]):
+        return r.title()
+
+    words = r.split()
+    return " ".join(words[:2]).rstrip(".,;:").title()
 
 
 def audit_publisher_domain(
@@ -96,7 +133,7 @@ def audit_publisher_domain(
                 recent.append(
                     FactCheckReference(
                         title=item.get("title", ""),
-                        rating=item.get("rating", ""),
+                        rating=shorten_debunk_rating(item.get("rating", "")),
                         fact_checker=item.get("publisher_name", "Fact-Checker"),
                         review_date=item.get("claim_date"),
                         review_url=item.get("rating_url", ""),

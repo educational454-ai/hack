@@ -33,7 +33,7 @@ class Config:
 
     @property
     def top_k_evidence(self) -> int:
-        return int(os.getenv("TOP_K_EVIDENCE", "4"))
+        return int(os.getenv("TOP_K_EVIDENCE", "6"))
 
     @property
     def http_timeout(self) -> float:

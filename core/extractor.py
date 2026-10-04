@@ -31,19 +31,30 @@ DISCARD_PATTERNS = [
 
 
 def clean_html_to_text(html: str) -> str:
-    """Strips boilerplate tags and extracts readable article text."""
+    """Strips boilerplate tags and extracts readable article text.
+    
+    Preserves <form> tags because ASP.NET (.aspx) government portals (e.g. pib.gov.in,
+    nic.in, mohfw.gov.in) wrap their entire page body inside <form id="form1">.
+    """
     soup = BeautifulSoup(html, "html.parser")
 
-    # Remove non-content elements
-    for tag in soup(["script", "style", "nav", "header", "footer", "aside", "noscript", "form", "svg"]):
+    # Remove non-content elements (do NOT decompose form)
+    for tag in soup(["script", "style", "nav", "header", "footer", "aside", "noscript", "svg", "button", "input"]):
         tag.decompose()
 
     # Extract text from paragraphs, headers, and list items
     blocks = []
-    for element in soup.find_all(["p", "h1", "h2", "h3", "article", "blockquote"]):
+    for element in soup.find_all(["p", "h1", "h2", "h3", "h4", "article", "blockquote"]):
         text = element.get_text(separator=" ", strip=True)
-        if len(text.split()) >= 6: # Ignore tiny snippets
+        if len(text.split()) >= 6:  # Ignore tiny snippets
             blocks.append(text)
+
+    # Fallback for pages where content is predominantly in tables/divs without standard p tags
+    if not blocks:
+        for element in soup.find_all(["div", "td", "li"]):
+            text = element.get_text(separator=" ", strip=True)
+            if len(text.split()) >= 15:
+                blocks.append(text)
 
     full_text = "\n\n".join(blocks)
     # Normalize whitespaces

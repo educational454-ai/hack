@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 VERDICT_SYMBOLS = {
     AssessmentVerdict.SUPPORTED: ("🟢", "Supported"),
     AssessmentVerdict.CONTRADICTED: ("🔴", "Contradicted"),
-    AssessmentVerdict.INSUFFICIENT_EVIDENCE: ("🟡", "Insufficient Evidence"),
+    AssessmentVerdict.INSUFFICIENT_EVIDENCE: ("🟡", "No Official Evidence"),
     AssessmentVerdict.CONFLICTING_EVIDENCE: ("🟠", "Conflicting Evidence"),
     AssessmentVerdict.SUBJECTIVE_OPINION: ("🔵", "Subjective / Opinion"),
 }
@@ -83,17 +83,23 @@ You must respond with ONLY a valid JSON object conforming to this format:
 """
 
 
-def format_evidence_prompt(claim: str, evidence: List[EvidenceItem]) -> str:
+def format_evidence_prompt(
+    claim: str, evidence: List[EvidenceItem], english_claim: Optional[str] = None
+) -> str:
     """Formats the claim and ranked evidence into an LLM prompt."""
+    claim_line = f"Claim to Analyze:\n\"{claim}\""
+    if english_claim and english_claim.strip() != claim.strip():
+        claim_line += f"\n(English Translation: \"{english_claim.strip()}\")"
+
     prompt_lines = [
-        f"Claim to Analyze:\n\"{claim}\"\n",
+        claim_line + "\n",
         "Retrieved Evidence Passages (Ranked by Relevance & Authority):",
         "INSTRUCTION: Evaluate logical entailment (supports / contradicts / neutral) STRICTLY and EXCLUSIVELY against the text inside Passage: \"...\". Source titles and domain metadata are for provenance identification only and must NOT be treated as factual passage evidence.",
     ]
 
-    for ev in evidence:
+    for idx, ev in enumerate(evidence):
         prompt_lines.append(
-            f"\n[ID: {ev.id}] (Source: {ev.domain} | Tier: {ev.source_tier.value.upper()} | Score: {ev.similarity_score})\n"
+            f"\n[ID: ev_{idx+1}] (Source: {ev.domain} | Tier: {ev.source_tier.value.upper()} | Score: {ev.similarity_score})\n"
             f"Title: {ev.title}\n"
             f"Passage: \"{ev.passage}\""
         )
@@ -218,7 +224,7 @@ def _validate_and_sanitize_hf_output(llm_dict: Any) -> Optional[Dict[str, Any]]:
 
 
 def analyze_with_huggingface(
-    claim: str, evidence: List[EvidenceItem]
+    claim: str, evidence: List[EvidenceItem], english_claim: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Runs the Hugging Face InferenceClient chat completion for evidence verification."""
     from huggingface_hub import InferenceClient
@@ -226,7 +232,7 @@ def analyze_with_huggingface(
     token_len = len(config.hf_token or "")
     logger.info(f"[HF Audit] Initializing InferenceClient (token_len={token_len}, model={config.hf_llm_model})")
     client = InferenceClient(token=config.hf_token)
-    user_prompt = format_evidence_prompt(claim, evidence)
+    user_prompt = format_evidence_prompt(claim, evidence, english_claim=english_claim)
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -309,7 +315,7 @@ def formulate_direct_statement(claim: str, verdict: Any) -> str:
         return f"Available sources report conflicting information regarding \"{c}\"."
 
     else:
-        return f"Available sources do not contain sufficient conclusive evidence regarding \"{c}\"."
+        return "No official evidence found. Here's what I found:"
 
 
 def analyze_with_heuristics(
@@ -321,7 +327,7 @@ def analyze_with_heuristics(
     detecting corroboration or refutation to reach supported, contradicted, or insufficient verdicts.
     """
     if not evidence:
-        direct = formulate_direct_statement(parsed.original_text, AssessmentVerdict.INSUFFICIENT_EVIDENCE)
+        direct = "No official evidence found. Here's what I found:"
         return {
             "assessment": "insufficient_evidence",
             "confidence_score": 0.60,
@@ -332,7 +338,8 @@ def analyze_with_heuristics(
         }
 
     claim_text = parsed.original_text.strip()
-    claim_lower = claim_text.lower()
+    eval_text = (getattr(parsed, "english_text", None) or parsed.original_text).strip()
+    claim_lower = eval_text.lower()
 
     # Extract non-stopword tokens as entities
     words = [
@@ -419,7 +426,14 @@ def analyze_with_heuristics(
                 stance = "contradicts"
                 reasoning = f"Passage from {ev.domain} refutes the claim as inaccurate or debunked."
                 contradict_count += 1
-            elif ev.similarity_score >= 0.55 and any(w in text_corpus for w in re.findall(r"\b[a-zA-Z0-9_-]{4,}\b", claim_lower)):
+            elif (
+                (ev.similarity_score >= 0.40 or ev.source_tier == SourceTier.PRIMARY)
+                and (
+                    not entities
+                    or any(e in text_corpus for e in entities)
+                )
+                and not has_refute
+            ):
                 stance = "supports"
                 reasoning = f"Authoritative reporting from {ev.domain} corroborates the claim."
                 support_count += 1
@@ -527,6 +541,9 @@ def _validate_llm_provenance(
     for idx, item in enumerate(supplied_evidence):
         id_map[item.id] = item
         id_map[item.id.lower()] = item
+        # Map sequential ev_N and evN for prompt relative position
+        id_map[f"ev_{idx + 1}"] = item
+        id_map[f"ev{idx + 1}"] = item
         # Map numeric index (1-based and 0-based)
         index_map[idx + 1] = item
         index_map[idx] = item
@@ -647,7 +664,9 @@ def verify_claim_evidence(
         hf_attempted = True
         try:
             logger.info(f"Calling Hugging Face LLM model: {config.hf_llm_model}...")
-            llm_raw_result = analyze_with_huggingface(parsed.original_text, evidence)
+            llm_raw_result = analyze_with_huggingface(
+                parsed.original_text, evidence, english_claim=getattr(parsed, "english_text", None)
+            )
         except Exception as e:
             logger.warning(f"Hugging Face Inference call failed: {e}. Falling back to heuristic analysis.")
             hf_attempted = False
@@ -724,7 +743,10 @@ def verify_claim_evidence(
             else:
                 explanation = "Retrieved evidence is restricted to low-confidence or non-decisive sources and lacks authoritative primary or secondary corroboration for the claim."
                 limitations.append("Supporting evidence is restricted to low-confidence sources; insufficient for a definitive supported verdict.")
-            supporting = []
+            for ev_item in evidence[:5]:
+                if not ev_item.stance:
+                    ev_item.stance = EvidenceStance.NEUTRAL
+            supporting = evidence[:5] if evidence else []
             contradicting = []
 
     elif verdict == AssessmentVerdict.CONTRADICTED:
@@ -736,18 +758,29 @@ def verify_claim_evidence(
             else:
                 explanation = "Retrieved evidence is restricted to low-confidence or non-decisive sources and lacks authoritative primary or secondary refutation of the claim."
                 limitations.append("Contradicting evidence is restricted to low-confidence sources; insufficient for a definitive contradicted verdict.")
-            supporting = []
+            for ev_item in evidence[:5]:
+                if not ev_item.stance:
+                    ev_item.stance = EvidenceStance.NEUTRAL
+            supporting = evidence[:5] if evidence else []
             contradicting = []
 
     elif verdict == AssessmentVerdict.CONFLICTING_EVIDENCE:
         if not supporting or not contradicting:
             verdict = AssessmentVerdict.INSUFFICIENT_EVIDENCE
             confidence = min(confidence, 0.70)
-            supporting = []
+            supporting = evidence[:5]
             contradicting = []
 
     elif verdict in (AssessmentVerdict.INSUFFICIENT_EVIDENCE, AssessmentVerdict.SUBJECTIVE_OPINION):
-        supporting = []
-        contradicting = []
+        if verdict == AssessmentVerdict.INSUFFICIENT_EVIDENCE and evidence:
+            # Retain available related evidence so user can inspect related reporting
+            for ev_item in evidence[:5]:
+                if not ev_item.stance:
+                    ev_item.stance = EvidenceStance.NEUTRAL
+            supporting = evidence[:5]
+            contradicting = []
+        else:
+            supporting = []
+            contradicting = []
 
     return verdict, confidence, explanation, supporting, contradicting, limitations

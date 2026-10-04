@@ -6,7 +6,7 @@ most relevant evidence items while reducing noise for the LLM.
 
 import logging
 import math
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from .config import config
 from .schemas import EvidenceItem, SourceTier
 
@@ -151,15 +151,30 @@ def rank_evidence_chunks(
     if not similarity_scores or len(similarity_scores) != len(chunks):
         similarity_scores = [compute_lexical_similarity(claim, p) for p in passages]
 
-    # Combine similarity with source tier weight and publisher historical modifier
+    import re
+    claim_nums = set(re.findall(r"\b\d+\b", claim))
+    units = {"crore", "lakh", "billion", "million", "thousand", "percent", "pct"}
+    claim_units = {w.lower() for w in re.findall(r"\b[a-zA-Z]+\b", claim) if w.lower() in units}
+
+    # Combine similarity with source tier weight, entity boost, and publisher historical modifier
     scored_items: List[EvidenceItem] = []
     for idx, chunk in enumerate(chunks):
         base_sim = similarity_scores[idx] if idx < len(similarity_scores) else 0.0
         tier = chunk["source_tier"]
         domain = chunk.get("domain", "")
+        p_text = chunk["passage"]
+
+        # Quantitative entity match boost
+        passage_nums = set(re.findall(r"\b\d+\b", p_text))
+        passage_lower = p_text.lower()
+        entity_boost = 1.0
+        if claim_nums and claim_nums.intersection(passage_nums):
+            entity_boost += 0.15
+        if claim_units and any(u in passage_lower for u in claim_units):
+            entity_boost += 0.10
 
         # Tier weighting
-        tier_multiplier = 1.05 if tier == SourceTier.PRIMARY else (1.0 if tier == SourceTier.SECONDARY else 0.8)
+        tier_multiplier = 1.15 if tier == SourceTier.PRIMARY else (1.05 if tier == SourceTier.SECONDARY else 0.8)
 
         # Publisher historical credibility modifier (0.75x to 1.05x)
         pub_modifier = 1.0
@@ -167,7 +182,7 @@ def rank_evidence_chunks(
             pub_record = publisher_records[domain]
             pub_modifier = getattr(pub_record, "credibility_modifier", 1.0)
 
-        final_score = round(base_sim * tier_multiplier * pub_modifier, 4)
+        final_score = round(base_sim * tier_multiplier * pub_modifier * entity_boost, 4)
 
         scored_items.append(EvidenceItem(
             id=f"ev_{idx+1}",
@@ -183,13 +198,15 @@ def rank_evidence_chunks(
     # Sort descending by similarity score
     scored_items.sort(key=lambda item: item.similarity_score, reverse=True)
 
-    # Deduplicate items by URL so we have variety in sources
+    # Deduplicate items by URL while allowing up to 2 high-scoring passages for primary/authoritative sources
     unique_by_url: List[EvidenceItem] = []
-    seen_urls = set()
+    domain_counts: Dict[str, int] = {}
     for item in scored_items:
-        if item.url not in seen_urls:
+        max_allowed = 2 if item.source_tier in (SourceTier.PRIMARY, SourceTier.SECONDARY) else 1
+        count = domain_counts.get(item.domain, 0)
+        if count < max_allowed:
             unique_by_url.append(item)
-            seen_urls.add(item.url)
+            domain_counts[item.domain] = count + 1
         elif len(unique_by_url) < top_k:
             unique_by_url.append(item)
 

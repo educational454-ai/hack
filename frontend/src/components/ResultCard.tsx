@@ -1,23 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ExternalLink,
   BookOpen,
   AlertTriangle,
+  AlertCircle,
   XCircle,
   CheckCircle2,
   HelpCircle,
   Image as ImageIcon,
   ShieldCheck,
-  ShieldAlert,
   Languages,
-  Award,
 } from "lucide-react";
 import {
   AnalysisResult,
   EvidenceItem,
   RelevantImage,
   FactCheckItem,
-  PublisherTransparencyRecord,
 } from "../types";
 
 interface ResultCardProps {
@@ -38,6 +36,13 @@ function extractDomain(url: string): string {
 
 export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
   const isSubjective = result.claim_type === "subjective_opinion";
+  const isInsufficient =
+    result.verdict === "insufficient_evidence" ||
+    result.verdict_title?.toLowerCase().includes("insufficient");
+
+  const displayVerdictTitle = isInsufficient
+    ? "No Official Evidence"
+    : result.verdict_title;
 
   // Combine top evidence: 3 cards per row, maximum 2 rows = max 6 cards
   let summaryEvidence: EvidenceItem[] = [
@@ -59,6 +64,33 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
     }));
   }
   summaryEvidence = summaryEvidence.slice(0, 6);
+
+  // Distinct relevant resources for quick linking in insufficient evidence cases
+  const relevantResources = useMemo(() => {
+    const list: Array<{ url: string; domain: string; title?: string }> = [];
+    const seenUrls = new Set<string>();
+
+    const addSource = (url?: string, domain?: string, title?: string) => {
+      if (!url || !url.startsWith("http")) return;
+      const cleanUrl = url.trim();
+      if (seenUrls.has(cleanUrl)) return;
+      seenUrls.add(cleanUrl);
+      list.push({
+        url: cleanUrl,
+        domain: domain || extractDomain(cleanUrl),
+        title: title || domain || extractDomain(cleanUrl),
+      });
+    };
+
+    if (result.all_sources && result.all_sources.length > 0) {
+      result.all_sources.forEach((s) => addSource(s.url, s.domain, s.title));
+    }
+    if (summaryEvidence && summaryEvidence.length > 0) {
+      summaryEvidence.forEach((ev) => addSource(ev.url, ev.domain, ev.title));
+    }
+
+    return list.slice(0, 6);
+  }, [result.all_sources, summaryEvidence]);
 
   const images = result.relevant_images || [];
 
@@ -151,7 +183,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
                 ? "Image Claim Assessment"
                 : "Assessment"}
             </span>
-            <h2 className="verdict-title">{result.verdict_title}</h2>
+            <h2 className="verdict-title">{displayVerdictTitle}</h2>
           </div>
         </div>
 
@@ -169,7 +201,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
             className="meta-pill"
             title="Strength and consensus of retrieved evidence supporting or refuting this claim"
           >
-            {result.verdict_title === "TEXT EXTRACTED" || result.question_intent === "text_extraction"
+            {displayVerdictTitle === "TEXT EXTRACTED" || result.question_intent === "text_extraction"
               ? "Extraction Accuracy"
               : "Evidence Strength"}
             : {Math.round(result.confidence_score * 100)}%
@@ -181,23 +213,54 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
       </div>
 
       {/* 2. Answer Statement */}
-      {result.targeted_answer && (
-        <div className="card-section targeted-answer-card">
+      {(result.targeted_answer || isInsufficient) && (
+        <div className={`card-section targeted-answer-card ${isInsufficient ? "insufficient-answer-card" : ""}`}>
           <h3 className="card-heading">
-            <CheckCircle2 size={19} className="heading-icon" />
+            {isInsufficient ? (
+              <AlertCircle size={19} className="heading-icon text-amber-500" />
+            ) : (
+              <CheckCircle2 size={19} className="heading-icon" />
+            )}
             Answer
           </h3>
-          <p className="targeted-answer-text">{result.targeted_answer}</p>
+          <p className="targeted-answer-text">
+            {isInsufficient ? (
+              <>
+                <strong className="insufficient-heading-accent">No official evidence found.</strong> Here's what I found:
+              </>
+            ) : (
+              result.targeted_answer
+            )}
+          </p>
+
+          {isInsufficient && relevantResources.length > 0 && (
+            <div className="insufficient-resources-wrapper">
+              <span className="insufficient-resources-label">Relevant Resources:</span>
+              <div className="insufficient-resources-chips">
+                {relevantResources.map((res, idx) => (
+                  <a
+                    key={idx}
+                    href={res.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="insufficient-resource-chip"
+                    title={res.title || res.domain}
+                  >
+                    <ExternalLink size={12} className="res-icon" />
+                    <span className="chip-domain">{res.domain}</span>
+                    {res.title && res.title.toLowerCase() !== res.domain.toLowerCase() && (
+                      <span className="chip-title">— {res.title.slice(0, 40)}...</span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* 3. Google Fact-Checked By (if available) */}
       <FactCheckSection factChecks={result.fact_checks || []} />
-
-      {/* 3.5. Source Transparency & Historical Audit Records */}
-      <PublisherTransparencySection
-        records={result.publisher_transparency || []}
-      />
 
       {/* 4. Why? Evidence Synthesis */}
       <div className="explanation-card">
@@ -257,13 +320,22 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
       {/* 6. Visual Evidence Section (Conditional) */}
       <VisualEvidenceSection images={images} />
 
-      {/* 7. Summary Evidence Cards */}
+      {/* 7. Summary / Available Evidence Cards */}
       {!isSubjective && summaryEvidence.length > 0 && (
         <div className="card-section">
           <div className="card-section-header">
             <h3 className="card-heading" style={{ marginBottom: 0 }}>
-              <CheckCircle2 size={19} className="heading-icon" />
-              Retrieved Evidence Summary ({summaryEvidence.length} {summaryEvidence.length === 1 ? "item" : "items"})
+              {isInsufficient ? (
+                <>
+                  <BookOpen size={19} className="heading-icon" />
+                  Available Evidences & Relevant Resources ({summaryEvidence.length} {summaryEvidence.length === 1 ? "item" : "items"})
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={19} className="heading-icon" />
+                  Retrieved Evidence Summary ({summaryEvidence.length} {summaryEvidence.length === 1 ? "item" : "items"})
+                </>
+              )}
             </h3>
             {hasMultipleDomains ? (
               <span
@@ -281,6 +353,13 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
               </span>
             ) : null}
           </div>
+
+          {isInsufficient && (
+            <p className="visual-evidence-disclaimer" style={{ marginTop: "0.5rem", marginBottom: "0.75rem" }}>
+              No official documentation confirms this assertion. Here is what related reporting and indexed resources found on this topic.
+            </p>
+          )}
+
           <div className="evidence-summary-grid">
             {summaryEvidence.map((ev, idx) => (
               <SummaryEvidenceCard key={idx} item={ev} />
@@ -515,104 +594,6 @@ const FactCheckSection: React.FC<{ factChecks: FactCheckItem[] }> = ({ factCheck
                   Full fact-check <ExternalLink size={12} />
                 </a>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-/* --- Source Transparency & Publisher Historical Audit Component --- */
-const PublisherTransparencySection: React.FC<{
-  records: PublisherTransparencyRecord[];
-}> = ({ records }) => {
-  if (!records || records.length === 0) return null;
-
-  // Filter to records that have either past audits or official recognition
-  const activeRecords = records.filter(
-    (r) => r.total_audited_claims > 0 || r.credibility_modifier !== 1.0
-  );
-
-  if (activeRecords.length === 0) return null;
-
-  return (
-    <div className="card-section transparency-section">
-      <h3 className="card-heading">
-        <Award size={19} className="heading-icon" />
-        Publisher Transparency & Historical Audit ({activeRecords.length}{" "}
-        {activeRecords.length === 1 ? "source" : "sources"})
-      </h3>
-      <p className="visual-evidence-disclaimer">
-        Empirical evaluation of cited publisher domains against Schema.org ClaimReview registries.
-      </p>
-      <div className="transparency-grid">
-        {activeRecords.map((rec, idx) => {
-          const hasDebunks = rec.debunked_count > 0;
-          const isOfficial = rec.credibility_modifier >= 1.05 && rec.total_audited_claims === 0;
-
-          return (
-            <div key={idx} className="transparency-card">
-              <div className="transparency-header">
-                <span className="transparency-domain">{rec.domain}</span>
-                {isOfficial ? (
-                  <span className="transparency-badge official">
-                    <ShieldCheck size={12} /> Official / Primary Authority
-                  </span>
-                ) : hasDebunks ? (
-                  <span className="transparency-badge caution">
-                    <ShieldAlert size={12} /> {rec.debunked_count} Debunked Claim(s)
-                  </span>
-                ) : (
-                  <span className="transparency-badge verified">
-                    <ShieldCheck size={12} /> Verified Track Record
-                  </span>
-                )}
-              </div>
-
-              <div className="transparency-stats">
-                {rec.total_audited_claims > 0 ? (
-                  <>
-                    <span className="stat-item">
-                      Audited Articles: <strong>{rec.total_audited_claims}</strong>
-                    </span>
-                    <span className="stat-item">
-                      Corroborated: <strong style={{ color: "#16a34a" }}>{rec.verified_count}</strong>
-                    </span>
-                    <span className="stat-item">
-                      Contradicted: <strong style={{ color: hasDebunks ? "#dc2626" : "inherit" }}>{rec.debunked_count}</strong>
-                    </span>
-                  </>
-                ) : isOfficial ? (
-                  <span className="stat-item official-note">
-                    Recognized institutional body with direct statutory or scientific mandate.
-                  </span>
-                ) : null}
-              </div>
-
-              {rec.recent_reviews && rec.recent_reviews.length > 0 && (
-                <div className="transparency-reviews">
-                  <span className="reviews-title">Recent Fact-Checks for this Domain:</span>
-                  {rec.recent_reviews.map((rev, revIdx) => (
-                    <div key={revIdx} className="review-item">
-                      <div className="review-meta">
-                        <span className="review-checker">{rev.fact_checker}</span>
-                        <span className={`review-rating ${rev.rating.toLowerCase().includes("false") ? "false" : ""}`}>
-                          {rev.rating}
-                        </span>
-                      </div>
-                      <a
-                        href={rev.review_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="review-link"
-                      >
-                        "{rev.title.slice(0, 95)}..." <ExternalLink size={10} />
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}

@@ -58,7 +58,7 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     claim_en = translate_to_english_for_verification(claim_text, lang_code) if lang_code != "en" else claim_text
 
     # Step 1: Claim Parser
-    parsed = parse_claim(claim_text)
+    parsed = parse_claim(claim_text, english_text=claim_en if claim_en != claim_text else None)
     logger.info(f"Claim classified as: {parsed.claim_type.value}")
 
     # Subjective early-return (no fact-check needed)
@@ -133,13 +133,10 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
 
     # ── Step 3: Web Search Retrieval (Bilingual Queries) ──────────────────────
     search_queries = list(parsed.extracted_queries)
-    if claim_en != claim_text:
-        search_queries.insert(0, claim_en)
-        search_queries.append(f"{claim_en} fact check")
 
     logger.info(f"Searching web using queries: {search_queries}")
     candidates = retrieve_search_candidates(
-        search_queries, max_results=config.max_search_results
+        search_queries, max_results=max(config.max_search_results, 10)
     )
     logger.info(f"Retrieved {len(candidates)} search candidates.")
 
@@ -176,8 +173,9 @@ def analyze_claim_single(claim_text: str) -> AnalysisResult:
     all_chunks = fc_evidence_chunks + extracted_chunks
 
     # ── Step 6: BGE-M3 Semantic Similarity Ranking with Publisher Modifiers ───
+    ranking_query = parsed.english_text or parsed.original_text
     ranked_evidence = rank_evidence_chunks(
-        parsed.original_text,
+        ranking_query,
         all_chunks,
         top_k=config.top_k_evidence + len(fc_evidence_chunks),
         publisher_records=publisher_records,

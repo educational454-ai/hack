@@ -1,7 +1,7 @@
 """Claim parsing, classification, and query formulation module."""
 
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from .schemas import ClaimType, ParsedClaim
 
 # Evaluative / Subjective markers
@@ -91,29 +91,56 @@ def classify_claim_heuristics(text: str) -> Tuple[ClaimType, str, List[str]]:
     )
 
 
-def generate_search_queries(claim: str) -> List[str]:
-    """Generates targeted search queries for candidate evidence retrieval."""
-    clean = re.sub(r'["\']', '', claim).strip()
-    queries = [clean]
+def extract_search_keywords(text: str) -> str:
+    """Extracts high-signal keywords from a claim, prioritizing entities, numbers, and core topics."""
+    clean = re.sub(r'["\'?,!.]', ' ', text).strip()
+    stopwords = {
+        "did", "is", "was", "were", "are", "has", "have", "had", "can", "could", "will", "would",
+        "that", "this", "there", "a", "an", "the", "in", "on", "at", "about", "for", "with", "from",
+        "more", "than", "over", "fight", "against", "to", "of", "and", "or", "by", "its", "their",
+        "been", "into", "as", "such",
+        "hai", "tha", "thi", "the", "mein", "par", "se", "ko", "ka", "ki", "ke", "ne"
+    }
+    words = [w for w in clean.split() if w.lower() not in stopwords]
+    if not words:
+        return clean[:35]
 
-    # Add targeted verification query
-    queries.append(f"{clean} official announcement fact check")
+    # Prioritize numbers, quantitative units, acronyms, and capitalized entities
+    units = {"crore", "lakh", "billion", "million", "thousand", "percent", "rupees", "rs"}
+    high_priority = [
+        w for w in words
+        if any(c.isdigit() for c in w) or (w.isupper() and len(w) >= 2) or w[0].isupper() or w.lower() in units
+    ]
+    other_words = [w for w in words if w not in high_priority]
+    selected = high_priority + other_words
 
-    # Add specific news / source query
-    words = clean.split()
-    if len(words) > 3:
-        core_query = " ".join(words[:6])
-        queries.append(f"{core_query} news report")
+    return " ".join(selected[:6])
+
+
+def generate_search_queries(claim: str, english_claim: Optional[str] = None) -> List[str]:
+    """Generates targeted search queries for candidate evidence retrieval including government pages."""
+    queries: List[str] = []
+    base_text = english_claim if english_claim and english_claim.strip() else claim
+    keywords = extract_search_keywords(base_text)
+
+    # 1. Government / Official source query to explicitly scan official portals
+    queries.append(f"{keywords} government")
+
+    # 2. Concise keyword query (under 5 words) - high hit rate for mainstream news
+    queries.append(keywords)
+
+    # 3. News & Fact-check query
+    queries.append(f"{keywords} fact check")
 
     return list(dict.fromkeys(queries))[:3]
 
 
-def parse_claim(text: str) -> ParsedClaim:
+def parse_claim(text: str, english_text: Optional[str] = None) -> ParsedClaim:
     """Entrypoint to parse and classify a user input claim."""
     claim_type, explanation, perspectives = classify_claim_heuristics(text)
     is_verifiable = claim_type != ClaimType.SUBJECTIVE_OPINION
 
-    queries = generate_search_queries(text) if is_verifiable else []
+    queries = generate_search_queries(text, english_claim=english_text) if is_verifiable else []
 
     return ParsedClaim(
         original_text=text.strip(),
@@ -122,4 +149,5 @@ def parse_claim(text: str) -> ParsedClaim:
         is_verifiable=is_verifiable,
         perspectives=perspectives if not is_verifiable else None,
         extracted_queries=queries,
+        english_text=english_text.strip() if english_text else None,
     )

@@ -360,7 +360,7 @@ def analyze_image(
                 claim_type=ClaimType.FACTUAL,
                 verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
                 verdict_symbol="🟡",
-                verdict_title="INSUFFICIENT EVIDENCE",
+                verdict_title="NO OFFICIAL EVIDENCE",
                 confidence_score=0.3,
                 explanation=(
                     f"Answering visual appearance or spatial questions ('{clean_question}') "
@@ -415,7 +415,7 @@ def analyze_image(
                 claim_type=ClaimType.FACTUAL,
                 verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
                 verdict_symbol="🟡",
-                verdict_title="INSUFFICIENT EVIDENCE",
+                verdict_title="NO OFFICIAL EVIDENCE",
                 confidence_score=0.2,
                 explanation=expl,
                 supporting_evidence=[],
@@ -447,7 +447,7 @@ def analyze_image(
                     claim_type=ClaimType.FACTUAL,
                     verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
                     verdict_symbol="🟡",
-                    verdict_title="INSUFFICIENT EVIDENCE",
+                    verdict_title="NO OFFICIAL EVIDENCE",
                     confidence_score=0.2,
                     explanation=(
                         "Could not extract a reliable, verifiable factual claim proposition from the image text. "
@@ -474,7 +474,7 @@ def analyze_image(
                 claim_type=ClaimType.FACTUAL,
                 verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
                 verdict_symbol="🟡",
-                verdict_title="INSUFFICIENT EVIDENCE",
+                verdict_title="NO OFFICIAL EVIDENCE",
                 confidence_score=0.2,
                 explanation=(
                     "No legible text or factual claim was detected in the uploaded image to verify, "
@@ -511,7 +511,7 @@ def analyze_image(
             claim_type=ClaimType.FACTUAL,
             verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
             verdict_symbol="🟡",
-            verdict_title="INSUFFICIENT EVIDENCE",
+            verdict_title="NO OFFICIAL EVIDENCE",
             confidence_score=0.2,
             explanation="Could not resolve a verifiable claim proposition from the image and question.",
             supporting_evidence=[],

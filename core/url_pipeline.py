@@ -204,7 +204,7 @@ def analyze_url_with_question(
             claim_type=ClaimType.FACTUAL,
             verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
             verdict_symbol="🟡",
-            verdict_title="INSUFFICIENT EVIDENCE",
+            verdict_title="NO OFFICIAL EVIDENCE",
             confidence_score=0.4,
             explanation=f"The question '{user_question}' is contextual, but the provided webpage context did not contain sufficient information to identify the specific subject or event.",
             evidence_limitations=["The question could not be reliably resolved from the provided webpage context."],
@@ -298,7 +298,7 @@ def analyze_url_only(
             claim_type=ClaimType.FACTUAL,
             verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
             verdict_symbol="🟡",
-            verdict_title="INSUFFICIENT EVIDENCE",
+            verdict_title="NO OFFICIAL EVIDENCE",
             confidence_score=0.3,
             explanation=f"Unable to analyze webpage content. {fetch_res.error_message or 'The page was inaccessible.'}",
             evidence_limitations=[fetch_res.error_message or "Webpage fetch failed."],
@@ -317,7 +317,7 @@ def analyze_url_only(
             claim_type=ClaimType.FACTUAL,
             verdict=AssessmentVerdict.INSUFFICIENT_EVIDENCE,
             verdict_symbol="🟡",
-            verdict_title="INSUFFICIENT EVIDENCE",
+            verdict_title="NO OFFICIAL EVIDENCE",
             confidence_score=0.4,
             explanation="The webpage was fetched successfully, but contained insufficient verifiable text content.",
             evidence_limitations=["No clear verifiable claims could be extracted from page text."],
@@ -370,7 +370,7 @@ def analyze_url_only(
         summary_explanation = f"Independent evidence corroborates the key factual claims analyzed from this article ({supp_count} of {total} claims Supported)."
     else:
         article_verdict = AssessmentVerdict.INSUFFICIENT_EVIDENCE
-        article_symbol, article_title = "🟡", "INSUFFICIENT EVIDENCE"
+        article_symbol, article_title = "🟡", "NO OFFICIAL EVIDENCE"
         summary_explanation = f"Independent evidence was insufficient to establish conclusive support or contradiction for the {total} claims analyzed."
 
     # Deduplicate aggregated sources by canonical page URL while preserving distinct pages
