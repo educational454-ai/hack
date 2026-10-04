@@ -743,10 +743,7 @@ def verify_claim_evidence(
             else:
                 explanation = "Retrieved evidence is restricted to low-confidence or non-decisive sources and lacks authoritative primary or secondary corroboration for the claim."
                 limitations.append("Supporting evidence is restricted to low-confidence sources; insufficient for a definitive supported verdict.")
-            for ev_item in evidence[:5]:
-                if not ev_item.stance:
-                    ev_item.stance = EvidenceStance.NEUTRAL
-            supporting = evidence[:5] if evidence else []
+            supporting = []
             contradicting = []
 
     elif verdict == AssessmentVerdict.CONTRADICTED:
@@ -758,29 +755,18 @@ def verify_claim_evidence(
             else:
                 explanation = "Retrieved evidence is restricted to low-confidence or non-decisive sources and lacks authoritative primary or secondary refutation of the claim."
                 limitations.append("Contradicting evidence is restricted to low-confidence sources; insufficient for a definitive contradicted verdict.")
-            for ev_item in evidence[:5]:
-                if not ev_item.stance:
-                    ev_item.stance = EvidenceStance.NEUTRAL
-            supporting = evidence[:5] if evidence else []
+            supporting = []
             contradicting = []
 
     elif verdict == AssessmentVerdict.CONFLICTING_EVIDENCE:
         if not supporting or not contradicting:
             verdict = AssessmentVerdict.INSUFFICIENT_EVIDENCE
             confidence = min(confidence, 0.70)
-            supporting = evidence[:5]
+            supporting = []
             contradicting = []
 
     elif verdict in (AssessmentVerdict.INSUFFICIENT_EVIDENCE, AssessmentVerdict.SUBJECTIVE_OPINION):
-        if verdict == AssessmentVerdict.INSUFFICIENT_EVIDENCE and evidence:
-            # Retain available related evidence so user can inspect related reporting
-            for ev_item in evidence[:5]:
-                if not ev_item.stance:
-                    ev_item.stance = EvidenceStance.NEUTRAL
-            supporting = evidence[:5]
-            contradicting = []
-        else:
-            supporting = []
-            contradicting = []
+        supporting = []
+        contradicting = []
 
     return verdict, confidence, explanation, supporting, contradicting, limitations
